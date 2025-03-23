@@ -12,7 +12,6 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<UserType>(null);
     const router = useRouter();
-
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, (firebaseUser) => {
             if (firebaseUser) {
@@ -23,6 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     lastName: firebaseUser?.displayName
 
                 });
+                updateUserData(firebaseUser.uid);
                 router.replace("/(tabs)")
             } else {
                 setUser(null);
@@ -41,6 +41,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         } catch (error: any) {
             let msg = error.message;
+            console.log("err msg:", msg);
+            if(msg.includes("(auth/invalid-credential)")){
+                msg= "Hatalı giriş";
+            }
+            if(msg.includes("(auth/invalid-email)")){
+                msg= "Hatalı email";
+            }
             return { success: false, msg }
         }
     };
@@ -61,6 +68,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         } catch (error: any) {
             let msg = error.message;
+            if(msg.includes("(auth/email-already-in-use)")){
+                msg= "Bu email zaten kullanılıyor";
+            }
+            if(msg.includes("(auth/invalid-email)")){
+                msg= "Hatalı email";
+            }
             return { success: false, msg }
         }
     };
@@ -100,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return (
-        <AuthContext.Provider value={contextValue}>{children} </AuthContext.Provider>
+        <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
     );
 };
 
