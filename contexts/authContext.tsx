@@ -1,14 +1,38 @@
 import { auth, firestore } from "@/config/firebase";
 import { AuthContextType, UserType } from "@/types";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { useRouter } from "expo-router";
+import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { setDoc, doc, getDoc } from "firebase/firestore";
-import { createContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 
-const authContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | null>(null);
+
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<UserType>(null);
+    const router = useRouter();
+
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+            if (firebaseUser) {
+                setUser({
+                    uid: firebaseUser?.uid,
+                    email: firebaseUser?.email,
+                    firstName: firebaseUser?.displayName,
+                    lastName: firebaseUser?.displayName
+
+                });
+                router.replace("/(tabs)")
+            } else {
+                setUser(null);
+                router.replace("/(auth)/welcome")
+            }
+        });
+
+        return () => unsub();
+
+    }, []);
 
     const login = async (email: string, password: string) => {
         try {
@@ -43,11 +67,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const updateUserData = async (uid: string) => {
         try {
-            const docRef = doc(firestore, "patients",uid);
+            const docRef = doc(firestore, "patients", uid);
             const docSnap = await getDoc(docRef);
 
 
-            if(docSnap.exists()){
+            if (docSnap.exists()) {
                 const data = docSnap.data();
                 const userData: UserType = {
                     uid: data?.uid,
@@ -57,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     image: data.image || null,
 
                 };
-                setUser({...userData});
+                setUser({ ...userData });
 
             }
         } catch (error: any) {
@@ -76,6 +100,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return (
-        <authContex
-    )
+        <AuthContext.Provider value={contextValue}>{children} </AuthContext.Provider>
+    );
 };
+
+export const useAuth = (): AuthContextType => {
+    const context = useContext(AuthContext)
+    if (!context) {
+        throw new Error("useAuth must be used within an AuthProvider");
+    }
+    return context;
+}

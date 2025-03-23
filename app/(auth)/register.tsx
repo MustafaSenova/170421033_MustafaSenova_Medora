@@ -9,6 +9,7 @@ import Input from '@/components/Input'
 import * as Icons from 'phosphor-react-native'
 import Button from '@/components/Button'
 import { useRouter } from 'expo-router'
+import { useAuth } from '@/contexts/authContext'
 
 const Register = () => {
 
@@ -18,11 +19,25 @@ const Register = () => {
   const lastNameRef = useRef("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { register: registerUser } = useAuth();
 
   const handleSubmit = async () => {
-    if(!emailRef.current || !passwordRef.current || !firstNameRef.current || !lastNameRef.current  ){
-      Alert.alert('Kayıt Ol',"Lütfen tüm alanları doldurun");
+    if (!emailRef.current || !passwordRef.current || !firstNameRef.current || !lastNameRef.current) {
+      Alert.alert('Kayıt Ol', "Lütfen tüm alanları doldurun");
       return;
+    }
+
+    setIsLoading(true);
+    const res = await registerUser(
+      emailRef.current, 
+      passwordRef.current, 
+      firstNameRef.current, 
+      lastNameRef.current
+    );
+    setIsLoading(false);
+
+    if(!res.success){
+      Alert.alert('Kayit ol', res.msg);
     }
 
   }
@@ -89,7 +104,7 @@ const Register = () => {
 
         <View style={styles.footer}>
           <Typo size={15}>Zaten bir hesabınız var mı?</Typo>
-          <Pressable onPress={()=> router.navigate("/(auth)/login")}>
+          <Pressable onPress={() => router.navigate("/(auth)/login")}>
             <Typo size={15} fontWeight={'700'} color={colors.primary}>Giriş Yapın</Typo>
 
           </Pressable>
