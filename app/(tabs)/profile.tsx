@@ -21,7 +21,7 @@ const profile = () => {
     <ScreenWrapper>
       <Text>profile</Text>
       <Button onPress={handleLogout}>
-        <Typo color={colors.black}>Çıkış Yap</Typo>
+        <Typo color={colors.white}>Çıkış Yap</Typo>
       </Button>
     </ScreenWrapper>
   )

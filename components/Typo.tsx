@@ -23,10 +23,6 @@ const Typo = ({
         {children}
     </Text>
 
-
-
-
-
 }
 
 export default Typo

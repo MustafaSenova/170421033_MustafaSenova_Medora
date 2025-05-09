@@ -14,7 +14,7 @@ export default function CustomTabs({
 }: BottomTabBarProps) {
 
     const tabbarIcons: any = {
-        index: (isFocused: boolean)=>{
+        index: (isFocused: boolean)=>(
             <Icons.House
             size={verticalScale(30)}
             weight={isFocused ? "fill" : "regular"}
@@ -24,19 +24,19 @@ export default function CustomTabs({
             </Icons.House>
 
             
-        },
-        grafikler: (isFocused: boolean)=>{
-            <Icons.GraphicsCard
+        ),
+        graphs: (isFocused: boolean)=>(
+            <Icons.ChartDonut
             size={verticalScale(30)}
             weight={isFocused ? "fill" : "regular"}
             color={isFocused ? colors.primary : colors.neutral400}
             >
 
-            </Icons.GraphicsCard>
+            </Icons.ChartDonut>
 
             
-        },
-        randevular: (isFocused: boolean)=>{
+        ),
+        appointment: (isFocused: boolean)=>(
             <Icons.Calendar
             size={verticalScale(30)}
             weight={isFocused ? "fill" : "regular"}
@@ -46,21 +46,21 @@ export default function CustomTabs({
             </Icons.Calendar>
 
             
-        },
+        ),
 
-        gizlilik: (isFocused: boolean)=>{
-            <Icons.SecurityCamera
+        security: (isFocused: boolean)=>(
+            <Icons.ShieldChevron
             size={verticalScale(30)}
             weight={isFocused ? "fill" : "regular"}
             color={isFocused ? colors.primary : colors.neutral400}
             >
 
-            </Icons.SecurityCamera>
+            </Icons.ShieldChevron>
 
             
-        },
+        ),
 
-        profil: (isFocused: boolean)=>{
+        profile: (isFocused: boolean)=>(
             <Icons.User
             size={verticalScale(30)}
             weight={isFocused ? "fill" : "regular"}
@@ -70,7 +70,7 @@ export default function CustomTabs({
             </Icons.User>
 
             
-        },
+        ),
     }
   
 
@@ -117,9 +117,9 @@ export default function CustomTabs({
             onLongPress={onLongPress}
             style={styles.tabbarItem}
           >
-            <Text style={{ color: isFocused ? colors.primary : colors.white }}>
-              {label}
-            </Text>
+            {
+              tabbarIcons[route.name] && tabbarIcons[route.name](isFocused)
+            }
           </TouchableOpacity>
         );
       })}
