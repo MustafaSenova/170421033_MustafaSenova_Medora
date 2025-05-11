@@ -1,20 +1,80 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
-import { Tabs } from 'expo-router'
-import CustomTabs from '@/components/CustomTabs'
+import React from 'react';
+import { Tabs } from 'expo-router';
+import CustomTabs from '@/components/CustomTabs';
+import * as Icons from 'phosphor-react-native';
 
-const _layout = () => {
+// TabBar için tip tanımı
+type TabBarIconProps = {
+  color: string;
+  size: number;
+  focused: boolean;
+};
+
+// TabBar props için any tipi kullanmayı önlemek için
+type TabsProps = any;
+
+const TabsLayout = () => {
   return (
-    <Tabs tabBar={CustomTabs} screenOptions={{headerShown: false}}>
-      <Tabs.Screen name='graphs'/>
-      <Tabs.Screen name='appointment'/>
-      <Tabs.Screen name='index'/>
-      <Tabs.Screen name='security'/>
-      <Tabs.Screen name='profile'/>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+      }}
+      tabBar={(props: TabsProps) => <CustomTabs {...props} />}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Ana Sayfa',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.House
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="health-data"
+        options={{
+          title: 'Sağlık Verilerim',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.HeartStraight
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="health-metrics"
+        options={{
+          title: 'Sağlık Metrikleri',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.ChartLine
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profil',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.User
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
     </Tabs>
-  )
-}
+  );
+};
 
-export default _layout
-
-const styles = StyleSheet.create({})
+export default TabsLayout;

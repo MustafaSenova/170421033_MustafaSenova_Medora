@@ -1,5 +1,5 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
-import React, { useRef, useState } from 'react'
+import { Alert, Pressable, StyleSheet, View } from 'react-native'
+import React, { useCallback, useRef, useState } from 'react'
 import ScreenWrapper from '@/components/ScreenWrapper'
 import Typo from '@/components/Typo'
 import { colors, spacingX, spacingY } from '@/constants/theme'
@@ -12,43 +12,55 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '@/contexts/authContext'
 
 const Login = () => {
-
   const emailRef = useRef("");
   const passwordRef = useRef("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const {login: loginUser} = useAuth();
 
-  const handleSubmit = async () => {
-    if(!emailRef.current || !passwordRef.current ){
-      Alert.alert('Giriş Yap',"Lütfen tüm alanları doldurun");
+  const handleSubmit = useCallback(async () => {
+    if(!emailRef.current || !passwordRef.current){
+      Alert.alert('Giriş Yap', "Lütfen tüm alanları doldurun");
       return;
     }
 
     setIsLoading(true);
-    const res = await loginUser(emailRef.current, passwordRef.current);
-    setIsLoading(false);
-    if(!res.success){
-      Alert.alert("Giriş", res.msg)
+    try {
+      const res = await loginUser(emailRef.current, passwordRef.current);
+      if(!res.success){
+        Alert.alert("Giriş", res.msg);
+      }
+    } catch (error) {
+      Alert.alert("Giriş Hatası", "Giriş yapılırken bir hata oluştu");
+    } finally {
+      setIsLoading(false);
     }
+  }, [loginUser]);
 
-  }
+  const handleNavigateToRegister = useCallback(() => {
+    router.navigate("/(auth)/register");
+  }, [router]);
 
+  const handleEmailChange = useCallback((value: string) => {
+    emailRef.current = value;
+  }, []);
 
+  const handlePasswordChange = useCallback((value: string) => {
+    passwordRef.current = value;
+  }, []);
 
   return (
     <ScreenWrapper>
       <View style={styles.container}>
-        <BackButton iconSize={28}></BackButton>
+        <BackButton iconSize={28} />
 
-        <View style={{ gap: 5, marginTop: spacingY._20 }}>
+        <View style={styles.titleContainer}>
           <Typo size={30} fontWeight={"800"}>
             Merhaba,
           </Typo>
           <Typo size={30} fontWeight={"800"}>
             Tekrar Hoş Geldin
           </Typo>
-
         </View>
 
         <View style={styles.form}>
@@ -57,42 +69,35 @@ const Login = () => {
           </Typo>
           <Input
             placeholder='Mailinizi giriniz'
-            onChangeText={(value) => (emailRef.current = value)}
+            onChangeText={handleEmailChange}
             icon={<Icons.At size={verticalScale(26)} color={colors.neutral350} weight='fill' />}
-
-
           />
           <Input
             placeholder='Şifrenizi giriniz'
             secureTextEntry
-            onChangeText={(value) => (passwordRef.current = value)}
+            onChangeText={handlePasswordChange}
             icon={<Icons.Lock size={verticalScale(26)} color={colors.neutral350} weight='fill' />}
-
-
           />
 
-          <Typo size={14} color={colors.text} style={{ alignSelf: 'flex-end' }}>Şifremi Unuttum</Typo>
+          <Typo size={14} color={colors.text} style={styles.forgotPassword}>
+            Şifremi Unuttum
+          </Typo>
 
           <Button loading={isLoading} onPress={handleSubmit}>
             <Typo fontWeight={"700"} color={colors.black} size={21}>
               Giriş Yap
-
             </Typo>
-
           </Button>
         </View>
 
         <View style={styles.footer}>
           <Typo size={15}>Hesabınız yok mu?</Typo>
-          <Pressable onPress={()=> router.navigate("/(auth)/register")}>
-            <Typo size={15} fontWeight={'700'} color={colors.primary}>Kayıt Olun</Typo>
-
+          <Pressable onPress={handleNavigateToRegister}>
+            <Typo size={15} fontWeight={'700'} color={colors.primary}>
+              Kayıt Olun
+            </Typo>
           </Pressable>
-
-
-
         </View>
-
       </View>
     </ScreenWrapper>
   )
@@ -106,18 +111,15 @@ const styles = StyleSheet.create({
     gap: spacingY._30,
     paddingHorizontal: spacingX._20,
   },
-  welcomeText: {
-    fontSize: verticalScale(20),
-    fontWeight: "bold",
-    color: colors.text,
+  titleContainer: {
+    gap: 5, 
+    marginTop: spacingY._20
   },
   form: {
     gap: spacingY._20,
   },
   forgotPassword: {
-    textAlign: "right",
-    fontWeight: "500",
-    color: colors.text,
+    alignSelf: 'flex-end',
   },
   footer: {
     flexDirection: "row",
@@ -125,11 +127,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
   },
-  footerText: {
-    textAlign: "center",
-    color: colors.text,
-    fontSize: verticalScale(15),
-  }
-
-
 })

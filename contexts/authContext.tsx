@@ -1,8 +1,8 @@
 import { auth, firestore } from "@/config/firebase";
-import { AuthContextType, UserType } from "@/types";
+import { AuthContextType, UserHealthProfile, UserType } from "@/types";
 import { useRouter } from "expo-router";
 import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
-import { setDoc, doc, getDoc } from "firebase/firestore";
+import { setDoc, doc, getDoc, updateDoc } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState } from "react";
 
 
@@ -20,18 +20,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     email: firebaseUser?.email,
                     firstName: firebaseUser?.displayName,
                     lastName: firebaseUser?.displayName
-
                 });
-                updateUserData(firebaseUser.uid);
-                router.replace("/(tabs)")
+                updateUserData(firebaseUser.uid).then(() => {
+                    // Check if user has health profile data after updating user data
+                    const docRef = doc(firestore, "patients", firebaseUser.uid);
+                    getDoc(docRef).then((docSnap) => {
+                        if (docSnap.exists()) {
+                            const userData = docSnap.data();
+                            if (!userData.healthProfile) {
+                                // Redirect to onboarding modal if no health profile exists
+                                router.replace("/(auth)/onboarding-modal");
+                            } else {
+                                router.replace("/(tabs)");
+                            }
+                        } else {
+                            router.replace("/(tabs)");
+                        }
+                    });
+                });
             } else {
                 setUser(null);
-                router.replace("/(auth)/welcome")
+                router.replace("/(auth)/welcome");
             }
         });
 
         return () => unsub();
-
     }, []);
 
     const login = async (email: string, password: string) => {
@@ -64,6 +77,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 email,
                 uid: response?.user?.uid,
             });
+            
+            // After registration, redirect to onboarding modal
+            router.replace("/(auth)/onboarding-modal");
+            
             return { success: true }
 
         } catch (error: any) {
@@ -92,7 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     firstName: data.firstName || null,
                     lastName: data.lastName || null,
                     image: data.image || null,
-
+                    healthProfile: data.healthProfile || null,
                 };
                 setUser({ ...userData });
 
@@ -104,12 +121,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const updateHealthProfile = async (
+        uid: string, 
+        healthProfileData: UserHealthProfile
+    ): Promise<{ success: boolean; msg?: string }> => {
+        try {
+            const docRef = doc(firestore, "patients", uid);
+            
+            // Update the health profile in Firestore
+            await updateDoc(docRef, {
+                healthProfile: healthProfileData,
+            });
+            
+            // Update local user state
+            if (user) {
+                setUser({
+                    ...user,
+                    healthProfile: healthProfileData,
+                });
+            }
+            
+            return { success: true };
+        } catch (error: any) {
+            console.error('Error updating health profile:', error);
+            return { 
+                success: false, 
+                msg: error.message || 'Failed to update health profile' 
+            };
+        }
+    };
+
     const contextValue: AuthContextType = {
         user,
         setUser,
         login,
         register,
         updateUserData,
+        updateHealthProfile,
     }
 
     return (

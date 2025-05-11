@@ -1,27 +1,29 @@
-import { Dimensions, Platform, StatusBar, StyleSheet, Text, View } from 'react-native'
-import React from 'react'
+import { Dimensions, Platform, StatusBar, StyleSheet, View } from 'react-native'
+import React, { memo, useMemo } from 'react'
 import { ScreenWrapperProps } from '@/types'
 import { colors } from '@/constants/theme'
 
 const {height} = Dimensions.get("window")
 
-const ScreenWrapper = ({style, children}:ScreenWrapperProps) => {
-
-    let paddingTop = Platform.OS == 'ios' ? height * 0.06 : 25;
-  return (
-    <View style={[
+const ScreenWrapper = memo(({style, children}: ScreenWrapperProps) => {
+    const paddingTop = Platform.OS === 'ios' ? height * 0.06 : 25;
+    
+    const containerStyle = useMemo(() => ([
       {
         paddingTop,
-        flex : 1,
-        backgroundColor  : colors.neutral900
+        flex: 1,
+        backgroundColor: colors.neutral900
       },
-      style]}>
-        <StatusBar barStyle={"light-content"}/>
+      style
+    ]), [style, paddingTop]);
+    
+    return (
+      <View style={containerStyle}>
+        <StatusBar barStyle="light-content" />
         {children}
-      
-    </View>
-  )
-}
+      </View>
+    )
+})
 
 export default ScreenWrapper
 

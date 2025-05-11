@@ -25,6 +25,28 @@ export default function CustomTabs({
 
             
         ),
+        'health-data': (isFocused: boolean)=>(
+            <Icons.HeartStraight
+            size={verticalScale(30)}
+            weight={isFocused ? "fill" : "regular"}
+            color={isFocused ? colors.primary : colors.neutral400}
+            >
+
+            </Icons.HeartStraight>
+
+            
+        ),
+        'health-metrics': (isFocused: boolean)=>(
+            <Icons.ChartLine
+            size={verticalScale(30)}
+            weight={isFocused ? "fill" : "regular"}
+            color={isFocused ? colors.primary : colors.neutral400}
+            >
+
+            </Icons.ChartLine>
+
+            
+        ),
         graphs: (isFocused: boolean)=>(
             <Icons.ChartDonut
             size={verticalScale(30)}
