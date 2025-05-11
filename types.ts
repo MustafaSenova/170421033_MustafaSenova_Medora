@@ -129,12 +129,12 @@ export type ImageUploadProps = {
 };
 
 export type UserHealthProfile = {
-  age?: number;
-  weight?: number; // in kg
-  height?: number; // in cm
-  gender?: 'male' | 'female' | 'other';
-  birthDate?: string; // in ISO format
-  bloodType?: string;
+  age?: number | null;
+  weight?: number | null;
+  height?: number | null;
+  gender?: 'male' | 'female' | 'other' | null;
+  birthDate?: string | null;
+  bloodType?: string | null;
   allergies?: string[];
   chronicConditions?: string[];
   emergencyContact?: {

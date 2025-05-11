@@ -16,12 +16,12 @@ export default function OnboardingModal() {
   const { user, updateHealthProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   
-  // Basic health profile form state
+  // Basic health profile form state with null values for Firebase compatibility
   const [formData, setFormData] = useState<UserHealthProfile>({
-    age: undefined,
-    weight: undefined,
-    height: undefined,
-    gender: undefined,
+    age: null,
+    weight: null,
+    height: null,
+    gender: null,
     birthDate: '',
     bloodType: '',
     allergies: [],
@@ -40,6 +40,23 @@ export default function OnboardingModal() {
     { label: 'Diğer', value: 'other' },
   ];
 
+  // Helper function to prepare data for Firebase by ensuring no undefined values
+  const prepareDataForFirebase = (data: UserHealthProfile): UserHealthProfile => {
+    const preparedData = { ...data };
+    
+    // Replace undefined values with null for Firebase compatibility
+    if (preparedData.age === undefined) preparedData.age = null;
+    if (preparedData.weight === undefined) preparedData.weight = null;
+    if (preparedData.height === undefined) preparedData.height = null;
+    if (preparedData.gender === undefined) preparedData.gender = null;
+    
+    // Ensure birthDate is a string
+    if (!preparedData.birthDate) preparedData.birthDate = '';
+    if (!preparedData.bloodType) preparedData.bloodType = '';
+    
+    return preparedData;
+  };
+
   const handleSave = async () => {
     if (!user?.uid) return;
     
@@ -47,7 +64,7 @@ export default function OnboardingModal() {
     
     try {
       // Calculate age from birthDate if available
-      if (formData.birthDate && !formData.age) {
+      if (formData.birthDate && (formData.age === undefined || formData.age === null)) {
         const birthDate = new Date(formData.birthDate);
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
@@ -58,9 +75,13 @@ export default function OnboardingModal() {
         formData.age = age;
       }
       
+      // Ensure lastUpdated is always the current date
       formData.lastUpdated = new Date().toISOString();
       
-      const result = await updateHealthProfile(user.uid, formData);
+      // Prepare data for Firebase by replacing undefined with null
+      const preparedData = prepareDataForFirebase(formData);
+      
+      const result = await updateHealthProfile(user.uid, preparedData);
       
       if (result.success) {
         router.push('/(tabs)');
@@ -75,8 +96,44 @@ export default function OnboardingModal() {
     }
   };
 
-  const handleSkip = () => {
-    router.push('/(tabs)');
+  const handleSkip = async () => {
+    if (!user?.uid) return;
+    
+    setLoading(true);
+    
+    try {
+      // Create an empty health profile with just the timestamp
+      const emptyProfile: UserHealthProfile = {
+        age: null,
+        weight: null,
+        height: null,
+        gender: null,
+        birthDate: '',
+        bloodType: '',
+        allergies: [],
+        chronicConditions: [],
+        emergencyContact: {
+          name: '',
+          phone: '',
+          relationship: '',
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+      
+      // Save the empty profile to mark onboarding as complete
+      const result = await updateHealthProfile(user.uid, emptyProfile);
+      
+      if (result.success) {
+        router.push('/(tabs)');
+      } else {
+        Alert.alert('Hata', result.msg || 'İşlem sırasında bir hata oluştu.');
+      }
+    } catch (error) {
+      console.error('Skip error:', error);
+      Alert.alert('Hata', 'İşlem sırasında bir hata oluştu.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -123,7 +180,7 @@ export default function OnboardingModal() {
             onChange={(date) => 
               setFormData({ 
                 ...formData, 
-                birthDate: date ? date.toISOString() : undefined 
+                birthDate: date ? date.toISOString() : '' 
               })
             }
             maximumDate={new Date()}
@@ -133,7 +190,7 @@ export default function OnboardingModal() {
             label="Boy (cm)"
             value={formData.height?.toString() || ''}
             onChangeText={(text) => 
-              setFormData({ ...formData, height: text ? Number(text) : undefined })
+              setFormData({ ...formData, height: text ? Number(text) : null })
             }
             keyboardType="numeric"
             placeholder="175"
@@ -143,7 +200,7 @@ export default function OnboardingModal() {
             label="Kilo (kg)"
             value={formData.weight?.toString() || ''}
             onChangeText={(text) => 
-              setFormData({ ...formData, weight: text ? Number(text) : undefined })
+              setFormData({ ...formData, weight: text ? Number(text) : null })
             }
             keyboardType="numeric"
             placeholder="70"
@@ -154,13 +211,19 @@ export default function OnboardingModal() {
           <Button 
             style={styles.skipButton as any} 
             onPress={handleSkip}
+            disabled={loading}
           >
-            <Typo color={colors.textLighter}>Atla</Typo>
+            {loading ? (
+              <ActivityIndicator color={colors.textLighter} size="small" />
+            ) : (
+              <Typo color={colors.textLighter}>Atla</Typo>
+            )}
           </Button>
           
           <Button 
             style={styles.saveButton} 
             onPress={handleSave}
+            disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color={colors.white} size="small" />

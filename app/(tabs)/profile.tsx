@@ -25,10 +25,10 @@ const ProfileScreen = () => {
   
   // Form state
   const [formData, setFormData] = useState<UserHealthProfile>({
-    age: undefined,
-    weight: undefined,
-    height: undefined,
-    gender: undefined,
+    age: null,
+    weight: null,
+    height: null,
+    gender: null,
     birthDate: '',
     bloodType: '',
     allergies: [],
@@ -82,7 +82,7 @@ const ProfileScreen = () => {
     
     try {
       // Calculate age from birthDate if available
-      if (formData.birthDate && !formData.age) {
+      if (formData.birthDate && (formData.age === undefined || formData.age === null)) {
         const birthDate = new Date(formData.birthDate);
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
@@ -95,7 +95,16 @@ const ProfileScreen = () => {
       
       formData.lastUpdated = new Date().toISOString();
       
-      const result = await updateHealthProfile(user.uid, formData);
+      // Prepare data for Firebase compatibility by converting undefined to null
+      const preparedData = { ...formData };
+      if (preparedData.age === undefined) preparedData.age = null;
+      if (preparedData.weight === undefined) preparedData.weight = null;
+      if (preparedData.height === undefined) preparedData.height = null;
+      if (preparedData.gender === undefined) preparedData.gender = null;
+      if (!preparedData.birthDate) preparedData.birthDate = '';
+      if (!preparedData.bloodType) preparedData.bloodType = '';
+      
+      const result = await updateHealthProfile(user.uid, preparedData);
       
       if (result.success) {
         setIsEditing(false);
@@ -195,7 +204,7 @@ const ProfileScreen = () => {
         onChange={(date) => 
           setFormData({ 
             ...formData, 
-            birthDate: date ? date.toISOString() : undefined 
+            birthDate: date ? date.toISOString() : '' 
           })
         }
         maximumDate={new Date()}
@@ -205,7 +214,7 @@ const ProfileScreen = () => {
         label="Boy (cm)"
         value={formData.height?.toString() || ''}
         onChangeText={(text) => 
-          setFormData({ ...formData, height: text ? Number(text) : undefined })
+          setFormData({ ...formData, height: text ? Number(text) : null })
         }
         keyboardType="numeric"
         placeholder="175"
@@ -215,7 +224,7 @@ const ProfileScreen = () => {
         label="Kilo (kg)"
         value={formData.weight?.toString() || ''}
         onChangeText={(text) => 
-          setFormData({ ...formData, weight: text ? Number(text) : undefined })
+          setFormData({ ...formData, weight: text ? Number(text) : null })
         }
         keyboardType="numeric"
         placeholder="70"
