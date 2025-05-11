@@ -128,12 +128,30 @@ export type ImageUploadProps = {
   placeholder?: string;
 };
 
+export type UserHealthProfile = {
+  age?: number;
+  weight?: number; // in kg
+  height?: number; // in cm
+  gender?: 'male' | 'female' | 'other';
+  birthDate?: string; // in ISO format
+  bloodType?: string;
+  allergies?: string[];
+  chronicConditions?: string[];
+  emergencyContact?: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
+  lastUpdated?: Date | string;
+};
+
 export type UserType = {
   uid?: string;
   email?: string | null;
   firstName: string | null;
   lastName: string | null;
   image?: any;
+  healthProfile?: UserHealthProfile;
 } | null;
 
 export type UserDataType = {
@@ -155,6 +173,10 @@ export type AuthContextType = {
     lastName: string,
   ) => Promise<{ success: boolean; msg?: string }>;
   updateUserData: (userId: string) => Promise<void>;
+  updateHealthProfile: (
+    userId: string,
+    healthProfileData: UserHealthProfile
+  ) => Promise<{ success: boolean; msg?: string }>;
 };
 
 export type ResponseType = {
