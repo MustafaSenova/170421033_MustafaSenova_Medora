@@ -9,7 +9,7 @@ import {
 } from '@/utils/healthData';
 
 // Development flag - mock data kullanmak için true yapın
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 
 // Mock data için geçici import
 import { 

@@ -72,6 +72,9 @@ export interface HealthDataResponse {
  */
 export const connectGoogleFit = async (): Promise<{ success: boolean; message?: string }> => {
   try {
+    // TODO: Google Cloud Console'dan aldığınız OAuth Client ID'yi buraya ekleyin
+    const CLIENT_ID = '961841426928-osptg1n236isl1rbj5gfv21aj2kd4ggv.apps.googleusercontent.com';
+    
     const options = {
       scopes: [
         Scopes.FITNESS_ACTIVITY_READ,
@@ -79,23 +82,31 @@ export const connectGoogleFit = async (): Promise<{ success: boolean; message?: 
         Scopes.FITNESS_HEART_RATE_READ,
         Scopes.FITNESS_BLOOD_PRESSURE_READ,
       ],
+      // OAuth Client ID'yi ekleyin (Google Cloud Console'dan alacaksınız)
+      clientId: CLIENT_ID,
     };
 
+    console.log('Google Fit bağlantısı başlatılıyor...');
+    console.log('Client ID:', CLIENT_ID);
+    
     const authResult = await GoogleFit.authorize(options);
+    console.log('Google Fit auth result:', authResult);
     
     if (authResult.success) {
+      console.log('Google Fit bağlantısı başarılı!');
       return { success: true };
     } else {
+      console.log('Google Fit bağlantısı başarısız:', authResult.message);
       return { 
         success: false, 
-        message: authResult.message || 'Yetkilendirme başarısız oldu.' 
+        message: authResult.message || 'Yetkilendirme başarısız oldu. Google Cloud Console ayarlarını kontrol edin.' 
       };
     }
   } catch (error) {
     console.error('Google Fit bağlantı hatası:', error);
     return { 
       success: false, 
-      message: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.' 
+      message: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu. Google Cloud Console ayarlarını kontrol edin.' 
     };
   }
 };
