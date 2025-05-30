@@ -5,6 +5,7 @@ import {  BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/
 import { colors, spacingY } from '@/constants/theme';
 import { verticalScale } from '@/utils/styling';
 import * as Icons from 'phosphor-react-native'
+import { useAuth } from '@/contexts/authContext';
 
 
 export default function CustomTabs({ 
@@ -12,8 +13,10 @@ export default function CustomTabs({
     descriptors, 
     navigation 
 }: BottomTabBarProps) {
+    const { user } = useAuth();
+    const isDoctor = user?.role === 'doctor';
 
-    const tabbarIcons: any = {
+    const patientTabIcons: any = {
         index: (isFocused: boolean)=>(
             <Icons.House
             size={verticalScale(30)}
@@ -69,19 +72,6 @@ export default function CustomTabs({
 
             
         ),
-
-        security: (isFocused: boolean)=>(
-            <Icons.ShieldChevron
-            size={verticalScale(30)}
-            weight={isFocused ? "fill" : "regular"}
-            color={isFocused ? colors.primary : colors.neutral400}
-            >
-
-            </Icons.ShieldChevron>
-
-            
-        ),
-
         profile: (isFocused: boolean)=>(
             <Icons.User
             size={verticalScale(30)}
@@ -93,12 +83,62 @@ export default function CustomTabs({
 
             
         ),
-    }
+    };
+
+    const doctorTabIcons: any = {
+        index: (isFocused: boolean)=>(
+            <Icons.House
+            size={verticalScale(30)}
+            weight={isFocused ? "fill" : "regular"}
+            color={isFocused ? colors.primary : colors.neutral400}
+            >
+
+            </Icons.House>
+        ),
+        'patients': (isFocused: boolean)=>(
+            <Icons.Users
+            size={verticalScale(30)}
+            weight={isFocused ? "fill" : "regular"}
+            color={isFocused ? colors.primary : colors.neutral400}
+            >
+
+            </Icons.Users>
+        ),
+        'appointment': (isFocused: boolean)=>(
+            <Icons.Calendar
+            size={verticalScale(30)}
+            weight={isFocused ? "fill" : "regular"}
+            color={isFocused ? colors.primary : colors.neutral400}
+            >
+
+            </Icons.Calendar>
+        ),
+        'messages': (isFocused: boolean)=>(
+            <Icons.ChatCircleText
+            size={verticalScale(30)}
+            weight={isFocused ? "fill" : "regular"}
+            color={isFocused ? colors.primary : colors.neutral400}
+            >
+
+            </Icons.ChatCircleText>
+        ),
+        profile: (isFocused: boolean)=>(
+            <Icons.User
+            size={verticalScale(30)}
+            weight={isFocused ? "fill" : "regular"}
+            color={isFocused ? colors.primary : colors.neutral400}
+            >
+
+            </Icons.User>
+        ),
+    };
+    
+    const tabbarIcons = isDoctor ? doctorTabIcons : patientTabIcons;
   
 
   return (
     <View style={styles.tabbar}>
-      {state.routes.map((route, index) => {
+      {state.routes.filter(route => tabbarIcons[route.name]).map((route, index) => {
         const { options } = descriptors[route.key];
         const label: any =
           options.tabBarLabel !== undefined

@@ -152,6 +152,7 @@ export type UserType = {
   lastName: string | null;
   image?: any;
   healthProfile?: UserHealthProfile;
+  role?: 'doctor' | 'patient';
 } | null;
 
 export type UserDataType = {
@@ -170,13 +171,14 @@ export type AuthContextType = {
     email: string,
     password: string,
     firstName: string,
-    lastName: string,
+    lastName: string
   ) => Promise<{ success: boolean; msg?: string }>;
   updateUserData: (userId: string) => Promise<void>;
   updateHealthProfile: (
     userId: string,
     healthProfileData: UserHealthProfile
   ) => Promise<{ success: boolean; msg?: string }>;
+  logout: () => Promise<{ success: boolean; msg?: string }>;
 };
 
 export type ResponseType = {

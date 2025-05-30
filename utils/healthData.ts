@@ -24,12 +24,46 @@ export type WeightResponse = {
   value: number;
 };
 
+export type ActivityResponse = {
+  startDate: string;
+  endDate: string;
+  value: number;
+};
+
+export type SleepResponse = {
+  startDate: string;
+  endDate: string;
+  duration: number; // dakika cinsinden
+  quality?: 'poor' | 'fair' | 'good' | 'excellent';
+};
+
+export type WaterIntakeResponse = {
+  startDate: string;
+  endDate: string;
+  volume: number; // ml cinsinden
+};
+
+export type ExerciseResponse = {
+  startDate: string;
+  endDate: string;
+  duration: number; // dakika cinsinden
+  type: string;
+  calories?: number;
+};
+
 export interface HealthDataResponse {
   heartRate: HeartRateResponse[];
   bloodPressure: BloodPressureResponse[];
   bodyMetrics: {
     weight: WeightResponse[];
     height: WeightResponse[];
+  };
+  activityData: {
+    steps: ActivityResponse[];
+    sleep: SleepResponse[];
+    calories: ActivityResponse[];
+    waterIntake: WaterIntakeResponse[];
+    exercises: ExerciseResponse[];
   };
 }
 
@@ -216,6 +250,13 @@ export const fetchAllHealthData = async (
         bodyMetrics: {
           weight: weightData,
           height: heightData,
+        },
+        activityData: {
+          steps: [],
+          sleep: [],
+          calories: [],
+          waterIntake: [],
+          exercises: [],
         },
       },
     };

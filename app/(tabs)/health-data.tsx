@@ -5,13 +5,40 @@ import Typo from '@/components/Typo';
 import Button from '@/components/Button';
 import { colors, spacingX, spacingY } from '@/constants/theme';
 import { 
-  connectGoogleFit, 
-  fetchAllHealthData, 
-  HeartRateResponse, 
-  BloodPressureResponse, 
-  WeightResponse,
   HealthDataResponse
 } from '@/utils/healthData';
+
+// Development flag - mock data kullanmak için true yapın
+const USE_MOCK_DATA = true;
+
+// Mock data için geçici import
+import { 
+  mockFetchHealthData,
+  mockConnectGoogleFit
+} from '@/utils/mockHealthData';
+// Gerçek Google Fit fonksiyonları
+import { 
+  connectGoogleFit as realConnectGoogleFit,
+  fetchAllHealthData as realFetchAllHealthData
+} from '@/utils/healthData';
+// Import GoogleFit for authorization check
+import GoogleFit from 'react-native-google-fit';
+
+// Development moduna göre fonksiyonları seç
+const connectGoogleFit = USE_MOCK_DATA ? mockConnectGoogleFit : realConnectGoogleFit;
+
+// Unified fetchAllHealthData wrapper
+const fetchAllHealthData = async (startDate?: string, endDate?: string) => {
+  if (USE_MOCK_DATA) {
+    return await mockFetchHealthData();
+  } else {
+    if (!startDate || !endDate) {
+      throw new Error('Start date and end date are required for real Google Fit API');
+    }
+    return await realFetchAllHealthData(startDate, endDate);
+  }
+};
+
 import { 
   analyzeHeartRate, 
   analyzeBloodPressure, 
@@ -20,11 +47,17 @@ import {
   detectHeartRateAnomalies,
   detectBloodPressureAnomalies,
   analyzeTrend,
-  TrendAnalysisResult
+  TrendAnalysisResult,
+  analyzeSteps,
+  analyzeSleep,
+  analyzeWaterIntake,
+  analyzeCalories,
+  analyzeExerciseWeekly
 } from '@/utils/healthAnalysis';
 import * as Icons from 'phosphor-react-native';
 import { verticalScale } from '@/utils/styling';
 import HealthTrendsCard from '@/components/HealthTrendsCard';
+import HealthChart from '@/components/HealthChart';
 import * as Haptics from 'expo-haptics';
 
 const HealthDataScreen = () => {
@@ -57,10 +90,11 @@ const HealthDataScreen = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Son 30 günlük tarih aralığı
+      
+      // Tarih parametrelerini hazırla (mock data için kullanılmayacak ama gerekmez)
       const endDate = new Date().toISOString();
       const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
+      
       const result = await fetchAllHealthData(startDate, endDate);
       
       if (result.success && result.data) {
@@ -82,10 +116,18 @@ const HealthDataScreen = () => {
     // Uygulama başlangıcında Google Fit bağlantı durumunu kontrol et
     const checkGoogleFitConnection = async () => {
       try {
-        // burada gerçek Google Fit bağlantısını kontrol edebilirsiniz
-        // Şimdilik sahte veri için geçici bir çözüm
-        setIsConnected(true);
-        fetchData();
+        if (USE_MOCK_DATA) {
+          // Mock modda otomatik olarak bağlı kabul et
+          setIsConnected(true);
+          fetchData();
+        } else {
+          // burada gerçek Google Fit bağlantısını kontrol edebilirsiniz
+          const isConnected = await GoogleFit.isAuthorized;
+          if (isConnected) {
+            setIsConnected(true);
+            fetchData();
+          }
+        }
       } catch (error) {
         console.error('Google Fit bağlantı kontrolü hatası:', error);
       }
@@ -343,6 +385,163 @@ const HealthDataScreen = () => {
     return recentData.map(item => item.value);
   };
 
+  // Adım verilerini al ve analiz et
+  const getLatestSteps = () => {
+    if (!healthData?.activityData?.steps || healthData.activityData.steps.length === 0) {
+      return { value: 'Veri yok', analysis: null };
+    }
+    
+    const latestData = [...healthData.activityData.steps]
+      .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0];
+    
+    if (!latestData) {
+      return { value: 'Veri yok', analysis: null };
+    }
+
+    const analysis = analyzeSteps(latestData.value);
+    return { 
+      value: `${latestData.value.toLocaleString()} adım`, 
+      analysis: analysis
+    };
+  };
+
+  // Uyku verilerini al ve analiz et
+  const getLatestSleep = () => {
+    if (!healthData?.activityData?.sleep || healthData.activityData.sleep.length === 0) {
+      return { value: 'Veri yok', analysis: null };
+    }
+    
+    const latestData = [...healthData.activityData.sleep]
+      .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0];
+    
+    if (!latestData) {
+      return { value: 'Veri yok', analysis: null };
+    }
+
+    const hours = Math.floor(latestData.duration / 60);
+    const minutes = latestData.duration % 60;
+    const analysis = analyzeSleep(latestData.duration, latestData.quality);
+    
+    return { 
+      value: `${hours}s ${minutes}d`, 
+      analysis: analysis,
+      quality: latestData.quality
+    };
+  };
+
+  // Su tüketimi verilerini al ve analiz et
+  const getLatestWaterIntake = () => {
+    if (!healthData?.activityData?.waterIntake || healthData.activityData.waterIntake.length === 0) {
+      return { value: 'Veri yok', analysis: null };
+    }
+    
+    const latestData = [...healthData.activityData.waterIntake]
+      .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0];
+    
+    if (!latestData) {
+      return { value: 'Veri yok', analysis: null };
+    }
+
+    const analysis = analyzeWaterIntake(latestData.volume);
+    return { 
+      value: `${(latestData.volume / 1000).toFixed(1)} L`, 
+      analysis: analysis
+    };
+  };
+
+  // Kalori verilerini al ve analiz et
+  const getLatestCalories = () => {
+    if (!healthData?.activityData?.calories || healthData.activityData.calories.length === 0) {
+      return { value: 'Veri yok', analysis: null };
+    }
+    
+    const latestData = [...healthData.activityData.calories]
+      .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0];
+    
+    if (!latestData) {
+      return { value: 'Veri yok', analysis: null };
+    }
+
+    const analysis = analyzeCalories(latestData.value);
+    return { 
+      value: `${latestData.value.toLocaleString()} kcal`, 
+      analysis: analysis
+    };
+  };
+
+  // Haftalık egzersiz süresi analizi
+  const getWeeklyExercise = () => {
+    if (!healthData?.activityData?.exercises || healthData.activityData.exercises.length === 0) {
+      return { value: 'Veri yok', analysis: null };
+    }
+    
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const weeklyExercises = healthData.activityData.exercises
+      .filter(item => new Date(item.endDate) > sevenDaysAgo);
+    
+    const totalMinutes = weeklyExercises.reduce((sum, exercise) => sum + exercise.duration, 0);
+    const analysis = analyzeExerciseWeekly(totalMinutes);
+    
+    return { 
+      value: `${totalMinutes} dakika`, 
+      analysis: analysis,
+      exerciseCount: weeklyExercises.length
+    };
+  };
+
+  // Grafik için veri dizileri
+  const getStepsValues = (): number[] | undefined => {
+    if (!healthData?.activityData?.steps || healthData.activityData.steps.length < 2) {
+      return undefined;
+    }
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentData = healthData.activityData.steps
+      .filter(item => new Date(item.endDate) > sevenDaysAgo)
+      .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+
+    return recentData.map(item => item.value);
+  };
+
+  const getSleepValues = (): number[] | undefined => {
+    if (!healthData?.activityData?.sleep || healthData.activityData.sleep.length < 2) {
+      return undefined;
+    }
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentData = healthData.activityData.sleep
+      .filter(item => new Date(item.endDate) > sevenDaysAgo)
+      .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+
+    return recentData.map(item => item.duration / 60); // saat cinsinden
+  };
+
+  const getWaterValues = (): number[] | undefined => {
+    if (!healthData?.activityData?.waterIntake || healthData.activityData.waterIntake.length < 2) {
+      return undefined;
+    }
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentData = healthData.activityData.waterIntake
+      .filter(item => new Date(item.endDate) > sevenDaysAgo)
+      .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+
+    return recentData.map(item => item.volume / 1000); // litre cinsinden
+  };
+
+  const getCaloriesValues = (): number[] | undefined => {
+    if (!healthData?.activityData?.calories || healthData.activityData.calories.length < 2) {
+      return undefined;
+    }
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentData = healthData.activityData.calories
+      .filter(item => new Date(item.endDate) > sevenDaysAgo)
+      .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+
+    return recentData.map(item => item.value);
+  };
+
   // Sağlık parametrelerini kart olarak gösterme komponenti
   const HealthCard = ({ 
     title, 
@@ -399,6 +598,12 @@ const HealthDataScreen = () => {
   const bloodPressureData = getLatestBloodPressure();
   // BMI verileri
   const bmiData = getBMIAnalysis();
+  // Yeni metrikler
+  const stepsData = getLatestSteps();
+  const sleepData = getLatestSleep();
+  const waterData = getLatestWaterIntake();
+  const caloriesData = getLatestCalories();
+  const exerciseData = getWeeklyExercise();
 
   return (
     <ScreenWrapper>
@@ -448,6 +653,7 @@ const HealthDataScreen = () => {
               Sağlık Verileri Analizi
             </Typo>
             
+            {/* Temel Sağlık Metrikleri */}
             <HealthTrendsCard 
               title="Kalp Atış Hızı Analizi"
               icon={<Icons.Heart size={verticalScale(26)} color={colors.rose} weight="fill" />}
@@ -456,7 +662,6 @@ const HealthDataScreen = () => {
               anomalyResults={getHeartRateAnomalies()}
               latestValue={heartRateData.value}
               onPress={() => {
-                // Detaylı sayfaya yönlendirme eklenebilir
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               }}
             />
@@ -482,15 +687,85 @@ const HealthDataScreen = () => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               }}
             />
-            
-            <HealthTrendsCard 
-              title="Vücut Kitle İndeksi (BMI)"
-              icon={<Icons.ChartBar size={verticalScale(26)} color={colors.primary} weight="fill" />}
-              latestValue={bmiData.value}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              }}
-            />
+
+            {/* Aktivite Grafikleri */}
+            <Typo size={16} fontWeight="700" style={styles.activitySectionTitle}>
+              Aktivite Grafikleri
+            </Typo>
+
+            {getStepsValues() && (
+              <HealthChart
+                title="Günlük Adım Sayısı"
+                data={getStepsValues()!}
+                type="bar"
+                color={colors.green}
+                unit=" adım"
+                target={10000}
+                showValues
+              />
+            )}
+
+            {getSleepValues() && (
+              <HealthChart
+                title="Uyku Süresi"
+                data={getSleepValues()!}
+                type="line"
+                color={colors.primary}
+                unit=" saat"
+                target={8}
+                showValues
+              />
+            )}
+
+            {getWaterValues() && (
+              <HealthChart
+                title="Su Tüketimi"
+                data={getWaterValues()!}
+                type="bar"
+                color={colors.secondary}
+                unit=" L"
+                target={2.5}
+                showValues
+              />
+            )}
+
+            {getCaloriesValues() && (
+              <HealthChart
+                title="Günlük Kalori"
+                data={getCaloriesValues()!}
+                type="line"
+                color={colors.rose}
+                unit=" kcal"
+                showValues
+              />
+            )}
+
+            {/* Hedef Kartları */}
+            <Typo size={16} fontWeight="700" style={styles.targetSectionTitle}>
+              Günlük Hedefler
+            </Typo>
+
+            {getStepsValues() && (
+              <HealthChart
+                title="Adım Hedefi"
+                data={getStepsValues()!}
+                type="progress"
+                color={colors.green}
+                unit=" adım"
+                target={10000}
+              />
+            )}
+
+            {getWaterValues() && (
+              <HealthChart
+                title="Su İçme Hedefi"
+                data={getWaterValues()!}
+                type="progress"
+                color={colors.secondary}
+                unit=" L"
+                target={2.5}
+              />
+            )}
             
             <Button onPress={fetchData} loading={loading} style={styles.refreshButton}>
               <Typo fontWeight="700" color={colors.black} size={16}>
@@ -501,6 +776,47 @@ const HealthDataScreen = () => {
         ) : (
           // Standart görünüm
           <View style={styles.dataContainer}>
+            {/* Özet Kart */}
+            <View style={styles.summaryCard}>
+              <Typo size={18} fontWeight="700" style={styles.summaryTitle}>
+                Sağlık Durumu Özeti
+              </Typo>
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryItem}>
+                  <Icons.Heart size={verticalScale(18)} color={colors.rose} weight="fill" />
+                  <Typo size={11} color={colors.textLighter}>Kalp Atışı</Typo>
+                  <Typo size={13} fontWeight="600">{heartRateData.value}</Typo>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Icons.Drop size={verticalScale(18)} color={colors.rose} weight="fill" />
+                  <Typo size={11} color={colors.textLighter}>Kan Basıncı</Typo>
+                  <Typo size={13} fontWeight="600">{bloodPressureData.value}</Typo>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Icons.Footprints size={verticalScale(18)} color={colors.green} weight="fill" />
+                  <Typo size={11} color={colors.textLighter}>Adım</Typo>
+                  <Typo size={13} fontWeight="600">{stepsData.value.split(' ')[0]}</Typo>
+                </View>
+              </View>
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryItem}>
+                  <Icons.MoonStars size={verticalScale(18)} color={colors.primary} weight="fill" />
+                  <Typo size={11} color={colors.textLighter}>Uyku</Typo>
+                  <Typo size={13} fontWeight="600">{sleepData.value}</Typo>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Icons.Drop size={verticalScale(18)} color={colors.secondary} weight="fill" />
+                  <Typo size={11} color={colors.textLighter}>Su</Typo>
+                  <Typo size={13} fontWeight="600">{waterData.value}</Typo>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Icons.ChartBar size={verticalScale(18)} color={colors.primary} weight="fill" />
+                  <Typo size={11} color={colors.textLighter}>BMI</Typo>
+                  <Typo size={13} fontWeight="600">{bmiData.value}</Typo>
+                </View>
+              </View>
+            </View>
+
             <HealthCard 
               title="Kalp Atış Hızı" 
               value={heartRateData.value} 
@@ -532,6 +848,42 @@ const HealthDataScreen = () => {
               value={bmiData.value} 
               icon={<Icons.ChartBar size={verticalScale(26)} color={colors.primary} weight="fill" />} 
               analysis={bmiData.analysis}
+            />
+
+            {/* Aktivite Metrikleri */}
+            <HealthCard 
+              title="Günlük Adım" 
+              value={stepsData.value} 
+              icon={<Icons.Footprints size={verticalScale(26)} color={colors.green} weight="fill" />} 
+              analysis={stepsData.analysis}
+            />
+
+            <HealthCard 
+              title="Uyku" 
+              value={sleepData.value} 
+              icon={<Icons.MoonStars size={verticalScale(26)} color={colors.primary} weight="fill" />} 
+              analysis={sleepData.analysis}
+            />
+
+            <HealthCard 
+              title="Su Tüketimi" 
+              value={waterData.value} 
+              icon={<Icons.Drop size={verticalScale(26)} color={colors.secondary} weight="fill" />} 
+              analysis={waterData.analysis}
+            />
+
+            <HealthCard 
+              title="Kalori" 
+              value={caloriesData.value} 
+              icon={<Icons.Fire size={verticalScale(26)} color={colors.rose} weight="fill" />} 
+              analysis={caloriesData.analysis}
+            />
+
+            <HealthCard 
+              title="Haftalık Egzersiz" 
+              value={exerciseData.value} 
+              icon={<Icons.Barbell size={verticalScale(26)} color={colors.green} weight="fill" />} 
+              analysis={exerciseData.analysis}
             />
             
             <Button onPress={fetchData} loading={loading} style={styles.refreshButton}>
@@ -611,6 +963,35 @@ const styles = StyleSheet.create({
     marginTop: spacingY._5,
   },
   refreshButton: {
+    marginTop: spacingY._20,
+  },
+  summaryCard: {
+    backgroundColor: colors.neutral800,
+    borderRadius: 12,
+    padding: spacingY._15,
+    marginBottom: spacingY._15,
+  },
+  summaryTitle: {
+    marginBottom: spacingY._15,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacingY._10,
+  },
+  summaryItem: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: spacingY._5,
+    flex: 1,
+  },
+  activitySectionTitle: {
+    marginBottom: spacingY._15,
+    marginTop: spacingY._20,
+  },
+  targetSectionTitle: {
+    marginBottom: spacingY._15,
     marginTop: spacingY._20,
   },
 }); 

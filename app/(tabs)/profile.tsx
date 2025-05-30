@@ -4,7 +4,6 @@ import ScreenWrapper from '@/components/ScreenWrapper';
 import Typo from '@/components/Typo';
 import Button from '@/components/Button';
 import { colors, spacingX, spacingY, radius } from '@/constants/theme';
-import { signOut } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { useAuth } from '@/contexts/authContext';
 import ProfileInputField from '@/components/ProfileInputField';
@@ -18,7 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 
 const ProfileScreen = () => {
-  const { user, updateHealthProfile } = useAuth();
+  const { user, updateHealthProfile, logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -58,7 +57,16 @@ const ProfileScreen = () => {
   }, [user]);
 
   const handleLogout = async () => {
-    await signOut(auth);
+    try {
+      const result = await logout();
+      
+      if (!result.success) {
+        Alert.alert('Hata', result.msg || 'Çıkış yapılırken bir hata oluştu.');
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert('Hata', 'Çıkış yapılırken bir hata oluştu.');
+    }
   };
 
   const handlePickImage = async () => {
