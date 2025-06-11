@@ -67,6 +67,9 @@ const Login = () => {
           <Typo size={14} color={colors.textLighter}>
             Sağlık verilerinizi takip etmek için giriş yapınız
           </Typo>
+          <Typo size={12} color={colors.textLighter} style={styles.roleInfo}>
+            Not: Doktor hesabı ile giriş yaparsanız doktor paneline, hasta hesabı ile giriş yaparsanız hasta paneline yönlendirileceksiniz.
+          </Typo>
           <Input
             placeholder='Mailinizi giriniz'
             onChangeText={handleEmailChange}
@@ -126,5 +129,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 5,
+  },
+  roleInfo: {
+    marginBottom: spacingY._10,
   },
 })

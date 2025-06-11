@@ -145,6 +145,16 @@ export type UserHealthProfile = {
   lastUpdated?: Date | string;
 };
 
+export type DoctorProfile = {
+  specialization?: string;
+  licenseNumber?: string;
+  hospital?: string;
+  department?: string;
+  experience?: number;
+  education?: string[];
+  certifications?: string[];
+};
+
 export type UserType = {
   uid?: string;
   email?: string | null;
@@ -152,6 +162,7 @@ export type UserType = {
   lastName: string | null;
   image?: any;
   healthProfile?: UserHealthProfile;
+  doctorProfile?: DoctorProfile;
   role?: 'doctor' | 'patient';
 } | null;
 
@@ -177,6 +188,10 @@ export type AuthContextType = {
   updateHealthProfile: (
     userId: string,
     healthProfileData: UserHealthProfile
+  ) => Promise<{ success: boolean; msg?: string }>;
+  updateProfileImage: (
+    userId: string,
+    imageUri: string
   ) => Promise<{ success: boolean; msg?: string }>;
   logout: () => Promise<{ success: boolean; msg?: string }>;
 };

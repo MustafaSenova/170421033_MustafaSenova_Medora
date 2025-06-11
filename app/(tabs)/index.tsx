@@ -1,6 +1,6 @@
 // app/(tabs)/predict.tsx
 import { useState } from 'react';
-import { View, ScrollView, Switch, StyleSheet } from 'react-native';
+import { View, ScrollView, Switch, StyleSheet, TouchableOpacity } from 'react-native';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
 import Typo from '@/components/Typo';
@@ -8,9 +8,101 @@ import { colors, spacingX, spacingY } from '@/constants/theme';
 import { verticalScale } from '@/utils/styling';
 import * as Icons from 'phosphor-react-native'
 import ScreenWrapper from '@/components/ScreenWrapper';
+import { useAuth } from '@/contexts/authContext';
+import { useRouter } from 'expo-router';
 
+const HomeScreen = () => {
+  const { user } = useAuth();
+  const router = useRouter();
+  const isDoctor = user?.role === 'doctor';
 
-const PredictScreen = () => {
+  if (isDoctor) {
+    return <DoctorHomeScreen />;
+  } else {
+    return <PatientHomeScreen />;
+  }
+};
+
+const DoctorHomeScreen = () => {
+  const { user } = useAuth();
+  const router = useRouter();
+
+  const doctorMenuItems = [
+    {
+      title: 'Hastalarım',
+      subtitle: 'Hasta listemi ve bilgilerini görüntüle',
+      icon: <Icons.Users size={verticalScale(32)} color={colors.primary} weight="fill" />,
+      onPress: () => router.push('/(tabs)/patients'),
+      bgColor: colors.neutral800,
+    },
+    {
+      title: 'Randevular',
+      subtitle: 'Günlük randevularımı ve programımı görüntüle',
+      icon: <Icons.Calendar size={verticalScale(32)} color={colors.green} weight="fill" />,
+      onPress: () => router.push('/(tabs)/appointment'),
+      bgColor: colors.neutral800,
+    },
+    {
+      title: 'Mesajlar',
+      subtitle: 'Hasta mesajlarını ve iletişimimi yönet',
+      icon: <Icons.ChatCircleText size={verticalScale(32)} color={colors.primaryLight} weight="fill" />,
+      onPress: () => router.push('/(tabs)/messages'),
+      bgColor: colors.neutral800,
+    },
+    {
+      title: 'Profil Ayarları',
+      subtitle: 'Doktor profilimi ve ayarlarımı düzenle',
+      icon: <Icons.UserGear size={verticalScale(32)} color={colors.rose} weight="fill" />,
+      onPress: () => router.push('/(tabs)/profile'),
+      bgColor: colors.neutral800,
+    },
+  ];
+
+  return (
+    <ScreenWrapper>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.header}>
+          <Typo size={28} fontWeight="800" color={colors.white}>
+            Hoş Geldiniz,
+          </Typo>
+          <Typo size={22} fontWeight="600" color={colors.primary}>
+            Dr. {user?.firstName} {user?.lastName}
+          </Typo>
+          {user?.doctorProfile?.specialization && (
+            <Typo size={14} color={colors.textLighter}>
+              {user.doctorProfile.specialization} • {user?.doctorProfile?.hospital}
+            </Typo>
+          )}
+        </View>
+
+        <View style={styles.menuGrid}>
+          {doctorMenuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.menuItem, { backgroundColor: item.bgColor }]}
+              onPress={item.onPress}
+            >
+              <View style={styles.menuIcon}>
+                {item.icon}
+              </View>
+              <View style={styles.menuContent}>
+                <Typo size={16} fontWeight="700" color={colors.text}>
+                  {item.title}
+                </Typo>
+                <Typo size={12} color={colors.textLighter} textProps={{ numberOfLines: 2 }}>
+                  {item.subtitle}
+                </Typo>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </ScreenWrapper>
+  );
+};
+
+const PatientHomeScreen = () => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     age: '',
     height: '',
@@ -29,11 +121,19 @@ const PredictScreen = () => {
   };
 
   return (
-
     <ScreenWrapper>
       <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.patientHeader}>
+          <Typo size={24} fontWeight="800" color={colors.white}>
+            Merhaba, {user?.firstName}
+          </Typo>
+          <Typo size={14} color={colors.textLighter}>
+            Sağlık verilerinizi takip edin ve risk analizlerinizi yapın
+          </Typo>
+        </View>
+
         <View style={styles.form}>
-          <Typo size={24} fontWeight="800" style={styles.title}>
+          <Typo size={20} fontWeight="800" style={styles.title}>
             Kardiyovasküler Risk Tahmini
           </Typo>
           <Typo size={14} color={colors.textLighter} style={styles.subtitle}>
@@ -124,13 +224,11 @@ const PredictScreen = () => {
           </Button>
         </View>
       </ScrollView>
-
     </ScreenWrapper>
-
   );
 };
 
-export default PredictScreen;
+export default HomeScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -138,6 +236,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacingX._20,
     paddingTop: spacingY._20,
     paddingBottom: spacingY._40,
+  },
+  header: {
+    marginBottom: spacingY._30,
+    paddingVertical: spacingY._20,
+  },
+  patientHeader: {
+    marginBottom: spacingY._20,
+    paddingVertical: spacingY._15,
+  },
+  menuGrid: {
+    gap: spacingY._15,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacingX._15,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.neutral600,
+  },
+  menuIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.neutral700,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacingX._15,
+  },
+  menuContent: {
+    flex: 1,
+    gap: 4,
   },
   form: {
     gap: spacingY._20,

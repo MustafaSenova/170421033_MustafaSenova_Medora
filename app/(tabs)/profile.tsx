@@ -18,9 +18,237 @@ import { router } from 'expo-router';
 
 const ProfileScreen = () => {
   const { user, updateHealthProfile, logout } = useAuth();
+  const isDoctor = user?.role === 'doctor';
+
+  if (isDoctor) {
+    return <DoctorProfileScreen />;
+  } else {
+    return <PatientProfileScreen />;
+  }
+};
+
+const DoctorProfileScreen = () => {
+  const { user, logout, updateProfileImage } = useAuth();
+  const [profileImage, setProfileImage] = useState<string | null>(user?.image || null);
+  const [imageUploading, setImageUploading] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      const result = await logout();
+      
+      if (!result.success) {
+        Alert.alert('Hata', result.msg || 'Çıkış yapılırken bir hata oluştu.');
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert('Hata', 'Çıkış yapılırken bir hata oluştu.');
+    }
+  };
+
+  const handlePickImage = async () => {
+    if (!user?.uid) return;
+    
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setImageUploading(true);
+      try {
+        const uploadResult = await updateProfileImage(user.uid, result.assets[0].uri);
+        
+        if (uploadResult.success) {
+          // Local state güncellemesi authContext'te yapılıyor
+          Alert.alert('Başarılı', 'Profil resminiz güncellendi.');
+        } else {
+          Alert.alert('Hata', uploadResult.msg || 'Resim yüklenemedi.');
+        }
+      } catch (error) {
+        console.error('Image upload error:', error);
+        Alert.alert('Hata', 'Resim yüklenirken bir hata oluştu.');
+      } finally {
+        setImageUploading(false);
+      }
+    }
+  };
+
+  // Update local profile image when user data changes
+  useEffect(() => {
+    setProfileImage(user?.image || null);
+  }, [user?.image]);
+
+  const renderDoctorProfileHeader = () => (
+    <View style={styles.profileHeader}>
+      <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage} disabled={imageUploading}>
+        {profileImage ? (
+          <Image source={{ uri: profileImage }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Icons.UserMinus size={verticalScale(40)} color={colors.white} weight="thin" />
+          </View>
+        )}
+        <View style={styles.editAvatarButton}>
+          {imageUploading ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Icons.PencilSimple size={verticalScale(16)} color={colors.white} />
+          )}
+        </View>
+      </TouchableOpacity>
+      
+      <View style={styles.nameContainer}>
+        <Typo size={20} fontWeight="600">
+          {user?.firstName} {user?.lastName}
+        </Typo>
+        <Typo size={14} color={colors.primary}>
+          {user?.doctorProfile?.specialization}
+        </Typo>
+        <Typo size={12} color={colors.textLighter}>
+          {user?.doctorProfile?.hospital}
+        </Typo>
+        <Typo size={12} color={colors.textLighter}>
+          {user?.email}
+        </Typo>
+      </View>
+    </View>
+  );
+
+  const renderDoctorInfo = () => (
+    <View style={styles.doctorInfoContainer}>
+      <View style={styles.infoCard}>
+        <Icons.Certificate size={verticalScale(24)} color={colors.primary} />
+        <View style={styles.infoContent}>
+          <Typo size={14} fontWeight="600">Lisans No</Typo>
+          <Typo size={12} color={colors.textLighter}>
+            {user?.doctorProfile?.licenseNumber || 'Belirtilmemiş'}
+          </Typo>
+        </View>
+      </View>
+      
+      <View style={styles.infoCard}>
+        <Icons.Timer size={verticalScale(24)} color={colors.green} />
+        <View style={styles.infoContent}>
+          <Typo size={14} fontWeight="600">Deneyim</Typo>
+          <Typo size={12} color={colors.textLighter}>
+            {user?.doctorProfile?.experience || 0} yıl
+          </Typo>
+        </View>
+      </View>
+      
+      <View style={styles.infoCard}>
+        <Icons.BuildingOffice size={verticalScale(24)} color={colors.primaryLight} />
+        <View style={styles.infoContent}>
+          <Typo size={14} fontWeight="600">Bölüm</Typo>
+          <Typo size={12} color={colors.textLighter}>
+            {user?.doctorProfile?.department || 'Belirtilmemiş'}
+          </Typo>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderDoctorSettings = () => (
+    <View style={styles.settingsContainer}>
+      <SettingsSection title="Doktor Bilgileri">
+        <SettingItem
+          icon={<Icons.User size={verticalScale(20)} color={colors.primary} />}
+          title="Profil Bilgilerim"
+          subtitle="Ad, soyad, uzmanlık alanı"
+          onPress={() => {}}
+        />
+        <SettingItem
+          icon={<Icons.Certificate size={verticalScale(20)} color={colors.primary} />}
+          title="Mesleki Bilgiler"
+          subtitle="Lisans, sertifikalar, deneyim"
+          onPress={() => {}}
+        />
+      </SettingsSection>
+      
+      <SettingsSection title="Hasta Yönetimi">
+        <SettingItem
+          icon={<Icons.Users size={verticalScale(20)} color={colors.green} />}
+          title="Hastalarım"
+          subtitle="Hasta listesi ve bilgileri"
+          onPress={() => router.push('/(tabs)/patients')}
+        />
+        <SettingItem
+          icon={<Icons.Calendar size={verticalScale(20)} color={colors.primaryLight} />}
+          title="Randevu Yönetimi"
+          subtitle="Randevu takvimi ve ayarları"
+          onPress={() => router.push('/(tabs)/appointment')}
+        />
+        <SettingItem
+          icon={<Icons.ChatCircleText size={verticalScale(20)} color={colors.primaryLight} />}
+          title="Mesajlarım"
+          subtitle="Hasta iletişimi"
+          onPress={() => router.push('/(tabs)/messages')}
+        />
+      </SettingsSection>
+
+      <SettingsSection title="Hesap Ayarları">
+        <SettingItem
+          icon={<Icons.Bell size={verticalScale(20)} color={colors.textLighter} />}
+          title="Bildirimler"
+          subtitle="Randevu ve mesaj bildirimleri"
+          onPress={() => {}}
+        />
+        <SettingItem
+          icon={<Icons.Lock size={verticalScale(20)} color={colors.textLighter} />}
+          title="Güvenlik ve Gizlilik"
+          onPress={() => router.push('/(tabs)/security')}
+        />
+        <SettingItem
+          icon={<Icons.SignOut size={verticalScale(20)} color={colors.rose} />}
+          title="Çıkış Yap"
+          onPress={handleLogout}
+          showArrow={false}
+        />
+      </SettingsSection>
+      
+      <SettingsSection title="Hakkında">
+        <SettingItem
+          icon={<Icons.Info size={verticalScale(20)} color={colors.textLighter} />}
+          title="Uygulama Bilgisi"
+          subtitle="Versiyon 1.0.0"
+          onPress={() => {}}
+        />
+        <SettingItem
+          icon={<Icons.FileText size={verticalScale(20)} color={colors.textLighter} />}
+          title="Gizlilik Politikası"
+          onPress={() => {}}
+        />
+        <SettingItem
+          icon={<Icons.Question size={verticalScale(20)} color={colors.textLighter} />}
+          title="Yardım ve Destek"
+          onPress={() => {}}
+        />
+      </SettingsSection>
+    </View>
+  );
+
+  return (
+    <ScreenWrapper>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {renderDoctorProfileHeader()}
+        {renderDoctorInfo()}
+        {renderDoctorSettings()}
+      </ScrollView>
+    </ScreenWrapper>
+  );
+};
+
+const PatientProfileScreen = () => {
+  const { user, updateHealthProfile, logout, updateProfileImage } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState<UserHealthProfile>({
@@ -56,6 +284,11 @@ const ProfileScreen = () => {
     }
   }, [user]);
 
+  // Update local profile image when user data changes
+  useEffect(() => {
+    setProfileImage(user?.image || null);
+  }, [user?.image]);
+
   const handleLogout = async () => {
     try {
       const result = await logout();
@@ -70,6 +303,8 @@ const ProfileScreen = () => {
   };
 
   const handlePickImage = async () => {
+    if (!user?.uid) return;
+    
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -78,8 +313,22 @@ const ProfileScreen = () => {
     });
 
     if (!result.canceled) {
-      setProfileImage(result.assets[0].uri);
-      // Update profile image logic would go here
+      setImageUploading(true);
+      try {
+        const uploadResult = await updateProfileImage(user.uid, result.assets[0].uri);
+        
+        if (uploadResult.success) {
+          // Local state güncellemesi authContext'te yapılıyor
+          Alert.alert('Başarılı', 'Profil resminiz güncellendi.');
+        } else {
+          Alert.alert('Hata', uploadResult.msg || 'Resim yüklenemedi.');
+        }
+      } catch (error) {
+        console.error('Image upload error:', error);
+        Alert.alert('Hata', 'Resim yüklenirken bir hata oluştu.');
+      } finally {
+        setImageUploading(false);
+      }
     }
   };
 
@@ -161,7 +410,7 @@ const ProfileScreen = () => {
 
   const renderProfileHeader = () => (
     <View style={styles.profileHeader}>
-      <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
+      <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage} disabled={imageUploading}>
         {profileImage ? (
           <Image source={{ uri: profileImage }} style={styles.avatar} />
         ) : (
@@ -170,7 +419,11 @@ const ProfileScreen = () => {
           </View>
         )}
         <View style={styles.editAvatarButton}>
-          <Icons.PencilSimple size={verticalScale(16)} color={colors.white} />
+          {imageUploading ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Icons.PencilSimple size={verticalScale(16)} color={colors.white} />
+          )}
         </View>
       </TouchableOpacity>
       
@@ -199,82 +452,73 @@ const ProfileScreen = () => {
 
   const renderHealthProfileForm = () => (
     <View style={styles.formContainer}>
-      <SelectField
-        label="Cinsiyet"
-        value={formData.gender || ''}
-        options={genderOptions}
-        onChange={(value) => setFormData({ ...formData, gender: value as 'male' | 'female' | 'other' })}
-      />
+      <Typo size={18} fontWeight="600" style={styles.sectionTitle}>
+        Temel Bilgiler
+      </Typo>
       
       <DatePickerField
         label="Doğum Tarihi"
         value={formData.birthDate ? new Date(formData.birthDate) : undefined}
-        onChange={(date) => 
-          setFormData({ 
-            ...formData, 
-            birthDate: date ? date.toISOString() : '' 
-          })
-        }
+        onChange={(date) => setFormData({ ...formData, birthDate: date ? date.toISOString() : '' })}
         maximumDate={new Date()}
       />
       
-      <ProfileInputField
-        label="Boy (cm)"
-        value={formData.height?.toString() || ''}
-        onChangeText={(text) => 
-          setFormData({ ...formData, height: text ? Number(text) : null })
-        }
-        keyboardType="numeric"
-        placeholder="175"
+      <SelectField
+        label="Cinsiyet"
+        value={formData.gender || ''}
+        onChange={(value) => setFormData({ ...formData, gender: value as any })}
+        options={genderOptions}
+        placeholder="Cinsiyetinizi seçin"
       />
       
       <ProfileInputField
         label="Kilo (kg)"
         value={formData.weight?.toString() || ''}
-        onChangeText={(text) => 
-          setFormData({ ...formData, weight: text ? Number(text) : null })
-        }
+        onChangeText={(text) => setFormData({ ...formData, weight: text ? parseFloat(text) : null })}
         keyboardType="numeric"
-        placeholder="70"
+        placeholder="75"
+      />
+      
+      <ProfileInputField
+        label="Boy (cm)"
+        value={formData.height?.toString() || ''}
+        onChangeText={(text) => setFormData({ ...formData, height: text ? parseFloat(text) : null })}
+        keyboardType="numeric"
+        placeholder="170"
       />
       
       <SelectField
         label="Kan Grubu"
         value={formData.bloodType || ''}
-        options={bloodTypeOptions}
         onChange={(value) => setFormData({ ...formData, bloodType: value })}
+        options={bloodTypeOptions}
+        placeholder="Kan grubunuzu seçin"
       />
       
-      <ProfileInputField
-        label="Alerjiler"
-        value={(formData.allergies || []).join(', ')}
-        onChangeText={(text) => 
-          setFormData({ 
-            ...formData, 
-            allergies: text.split(',').map(item => item.trim()).filter(Boolean)
-          })
-        }
-        placeholder="Penisilin, polen, vb."
-      />
-      
-      <ProfileInputField
-        label="Kronik Rahatsızlıklar"
-        value={(formData.chronicConditions || []).join(', ')}
-        onChangeText={(text) => 
-          setFormData({ 
-            ...formData, 
-            chronicConditions: text.split(',').map(item => item.trim()).filter(Boolean)
-          })
-        }
-        placeholder="Diyabet, hipertansiyon, vb."
-      />
-      
-      <Typo size={14} fontWeight="600" style={styles.sectionTitle}>
-        Acil Durum İletişim Bilgileri
+      <Typo size={18} fontWeight="600" style={styles.sectionTitle}>
+        Sağlık Bilgileri
       </Typo>
       
       <ProfileInputField
-        label="İsim Soyisim"
+        label="Alerjiler"
+        value={formData.allergies?.join(', ') || ''}
+        onChangeText={(text) => setFormData({ ...formData, allergies: text.split(',').map(item => item.trim()).filter(item => item) })}
+        placeholder="Polen, fıstık, vb. (virgülle ayırın)"
+      />
+      
+      <ProfileInputField
+        label="Kronik Hastalıklar"
+        value={formData.chronicConditions?.join(', ') || ''}
+        onChangeText={(text) => setFormData({ ...formData, chronicConditions: text.split(',').map(item => item.trim()).filter(item => item) })}
+        placeholder="Diyabet, hipertansiyon, vb. (virgülle ayırın)"
+      />
+      
+      <Typo size={18} fontWeight="600" style={styles.sectionTitle}>
+        Acil Durum İletişim
+      </Typo>
+      
+      <ProfileInputField
+        label="Ad Soyad"
         value={formData.emergencyContact?.name || ''}
         onChangeText={(text) => 
           setFormData({ 
@@ -456,6 +700,24 @@ const styles = StyleSheet.create({
   },
   nameContainer: {
     alignItems: 'center',
+  },
+  doctorInfoContainer: {
+    paddingHorizontal: spacingX._15,
+    marginBottom: spacingY._20,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.neutral800,
+    padding: spacingX._15,
+    borderRadius: 12,
+    marginBottom: spacingY._10,
+    borderWidth: 1,
+    borderColor: colors.neutral600,
+  },
+  infoContent: {
+    marginLeft: spacingX._15,
+    flex: 1,
   },
   onboardingHeader: {
     alignItems: 'center',

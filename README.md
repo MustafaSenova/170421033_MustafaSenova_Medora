@@ -116,3 +116,96 @@ Aşağıdaki izinlerin `app.json` dosyasında eklendiğinden emin olun:
   ]
 }
 ```
+
+# Medora Expo
+
+Hasta vücut verilerini alarak verileri ilgili doktora sunabilecek bir mobil uygulama. Verileri anlık olarak giyilebilir cihazlardan alacak ya da veri varsa çekecek. Çekilen verilerle eğitilen yapay zekalar ile sınıflandırma veya anomali tespiti yapacak.
+
+## Özellikler
+
+- **Hasta Sistemi**: Hasta kayıt olma, giriş yapma ve sağlık profili oluşturma
+- **Doktor Sistemi**: Doktor giriş sistemi ve hasta yönetimi
+- **Sağlık Verileri**: Kalp atış hızı, tansiyon, vb. veriler
+- **AI Tahminleri**: Kardiyovasküler risk tahmini
+- **Giyilebilir Cihaz Entegrasyonu**: Sağlık verilerinin otomatik toplanması
+
+## Kullanıcı Rolleri
+
+### Hasta
+- Kayıt olma ve giriş yapma
+- Sağlık profili oluşturma/düzenleme
+- Sağlık verilerini görüntüleme
+- Risk tahminleri alma
+- Sağlık metriklerini takip etme
+
+### Doktor
+- Giriş yapma (sadece admin tarafından oluşturulan hesaplar)
+- Hasta listesini görüntüleme
+- Randevu yönetimi
+- Hasta mesajlarını görüntüleme
+- Doktor profil bilgilerini görüntüleme
+
+## Doktor Hesabı Oluşturma
+
+Doktor hesapları sadece admin tarafından oluşturulabilir. Firebase Console üzerinden:
+
+1. **Authentication'da kullanıcı oluşturun:**
+   - Email: doktor@medora.com
+   - Password: güvenli_şifre
+
+2. **Firestore'da `doctors` collection'ında doktor belgesi oluşturun:**
+
+```json
+{
+  "uid": "doktor_auth_uid",
+  "email": "doktor@medora.com",
+  "firstName": "Dr. Mehmet",
+  "lastName": "Koç",
+  "role": "doctor",
+  "specialization": "Kardiyoloji",
+  "licenseNumber": "KRD-2024-001",
+  "hospital": "Marmara Üniversitesi Hastanesi",
+  "department": "Kardiyoloji Bölümü",
+  "experience": 15,
+  "education": ["İstanbul Üniversitesi Tıp Fakültesi"],
+  "certifications": ["Kardiyoloji Uzmanı"],
+  "image": null
+}
+```
+
+## Teknolojiler
+
+- **React Native + Expo**: Mobil uygulama geliştirme
+- **Firebase**: Authentication ve Firestore veritabanı
+- **TypeScript**: Tip güvenliği
+- **TensorFlow.js**: AI/ML tahminleri
+- **React Native Chart Kit**: Grafik görselleştirme
+
+## Kurulum
+
+```bash
+npm install
+npm start
+```
+
+## Arayüz Özellikleri
+
+### Hasta Arayüzü
+- Ana sayfa: Kardiyovasküler risk tahmini formu
+- Sağlık Verileri: Veri girişi ve görüntüleme
+- Sağlık Metrikleri: Grafik ve istatistikler
+- Profil: Sağlık profili yönetimi
+
+### Doktor Arayüzü
+- Ana sayfa: Hızlı erişim menüsü
+- Hastalarım: Hasta listesi ve bilgileri
+- Randevular: Randevu yönetimi
+- Mesajlar: Hasta iletişimi
+- Profil: Doktor bilgileri ve ayarlar
+
+## Güvenlik
+
+- Firebase Authentication ile güvenli giriş
+- Role-based access control (doktor/hasta)
+- Sağlık verilerinin şifrelenmiş saklanması
+- GDPR uyumlu veri yönetimi
