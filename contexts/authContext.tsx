@@ -1,4 +1,4 @@
-import { auth, firestore } from "@/config/firebase";
+import { auth, db } from "@/config/firebase";
 import { AuthContextType, UserHealthProfile, UserType, DoctorProfile } from "@/types";
 import { useRouter } from "expo-router";
 import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         router.replace("/(tabs)");
                     } else if (userData?.role === 'patient') {
                         // Hasta ise health profile kontrolü yap
-                        const docRef = doc(firestore, "patients", firebaseUser.uid);
+                        const docRef = doc(db, "patients", firebaseUser.uid);
                         const docSnap = await getDoc(docRef);
                         
                         if (docSnap.exists()) {
@@ -104,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 password);
             
             // Her zaman patients koleksiyonuna kaydet, sadece hastalar kayıt olabilir
-            await setDoc(doc(firestore, "patients", response?.user?.uid), {
+            await setDoc(doc(db, "patients", response?.user?.uid), {
                 firstName,
                 lastName,
                 email,
@@ -132,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const getUserData = async (uid: string): Promise<UserType> => {
         try {
             // First check if the user is a patient
-            const patientDocRef = doc(firestore, "patients", uid);
+            const patientDocRef = doc(db, "patients", uid);
             const patientDocSnap = await getDoc(patientDocRef);
 
             if (patientDocSnap.exists()) {
@@ -160,7 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             // If not found in patients, check doctors collection
-            const doctorDocRef = doc(firestore, "doctors", uid);
+            const doctorDocRef = doc(db, "doctors", uid);
             const doctorDocSnap = await getDoc(doctorDocRef);
 
             if (doctorDocSnap.exists()) {
@@ -175,14 +175,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     imageUri = data.image;
                 }
                 
+                // Doktor adını normalize et
+                const firstName = data.firstName || data.name?.split(' ')[0] || 'Doktor';
+                const lastName = data.lastName || data.name?.split(' ').slice(1).join(' ') || '';
+                
                 const userData: UserType = {
                     uid: data?.uid,
                     email: data.email || null,
-                    firstName: data.firstName || null,
-                    lastName: data.lastName || null,
+                    firstName: firstName,
+                    lastName: lastName,
                     image: imageUri,
                     doctorProfile: {
-                        specialization: data.specialization,
+                        specialization: data.specialization || data.specialty,
                         licenseNumber: data.licenseNumber,
                         hospital: data.hospital,
                         department: data.department,
@@ -223,7 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             
             // Hasta ise normal işleme devam et
-            const docRef = doc(firestore, "patients", uid);
+            const docRef = doc(db, "patients", uid);
             
             // Update the health profile in Firestore
             await updateDoc(docRef, {
@@ -287,7 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const userData = await getUserData(uid);
             const collection = userData?.role === 'doctor' ? 'doctors' : 'patients';
             
-            const docRef = doc(firestore, collection, uid);
+            const docRef = doc(db, collection, uid);
             await updateDoc(docRef, {
                 image: `local://${uid}`, // Local reference olarak sakla
             });
@@ -321,6 +325,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const refreshUserData = async (): Promise<void> => {
+        if (user?.uid) {
+            await getUserData(user.uid);
+        }
+    };
+
     const contextValue: AuthContextType = {
         user,
         setUser,
@@ -329,6 +339,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateUserData,
         updateHealthProfile,
         updateProfileImage,
+        refreshUserData,
         logout
     }
 

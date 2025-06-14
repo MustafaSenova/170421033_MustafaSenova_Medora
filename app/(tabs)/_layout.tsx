@@ -40,86 +40,90 @@ const TabsLayout = () => {
       />
 
       {/* Doctor-specific tabs */}
-      {isDoctor && (
-          <Tabs.Screen
-            name="patients"
-            options={{
-              title: 'Hastalarım',
-              tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
-                <Icons.Users
-                  size={size}
-                  color={color}
-                  weight={focused ? 'fill' : 'regular'}
-                />
-              ),
-            }}
-          />
-      )}
+      <Tabs.Screen
+        name="patients"
+        options={{
+          title: 'Hastalarım',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.Users
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
       
-      {isDoctor && (
-          <Tabs.Screen
-            name="appointment"
-            options={{
-              title: 'Randevular',
-              tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
-                <Icons.Calendar
-                  size={size}
-                  color={color}
-                  weight={focused ? 'fill' : 'regular'}
-                />
-              ),
-            }}
-          />
-      )}
+      <Tabs.Screen
+        name="appointment"
+        options={{
+          title: 'Randevular',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.Calendar
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
       
-      {isDoctor && (
-          <Tabs.Screen
-            name="messages"
-            options={{
-              title: 'Mesajlar',
-              tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
-                <Icons.ChatCircleText
-                  size={size}
-                  color={color}
-                  weight={focused ? 'fill' : 'regular'}
-                />
-              ),
-            }}
-          />
-      )}
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Mesajlar',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.ChatCircleText
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
 
       {/* Patient-specific tabs */}
-      {!isDoctor && (
-          <Tabs.Screen
-            name="health-data"
-            options={{
-              title: 'Sağlık Verilerim',
-              tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
-                <Icons.HeartStraight
-                  size={size}
-                  color={color}
-                  weight={focused ? 'fill' : 'regular'}
-                />
-              ),
-            }}
-          />
-      )}
+      <Tabs.Screen
+        name="appointments"
+        options={{
+          title: 'Randevularım',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.Calendar
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
       
-      {!isDoctor && (
-          <Tabs.Screen
-            name="health-metrics"
-            options={{
-              title: 'Sağlık Metrikleri',
-              tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
-                <Icons.ChartLine
-                  size={size}
-                  color={color}
-                  weight={focused ? 'fill' : 'regular'}
-                />
-              ),
-            }}
-          />
-      )}
+      <Tabs.Screen
+        name="health-data"
+        options={{
+          title: 'Sağlık Verilerim',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.HeartStraight
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
+      
+      <Tabs.Screen
+        name="health-metrics"
+        options={{
+          title: 'Sağlık Metrikleri',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.ChartLine
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
 
       <Tabs.Screen
         name="profile"

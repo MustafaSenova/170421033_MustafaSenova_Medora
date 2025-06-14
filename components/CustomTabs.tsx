@@ -16,6 +16,17 @@ export default function CustomTabs({
     const { user } = useAuth();
     const isDoctor = user?.role === 'doctor';
 
+    // Kullanıcı rolüne göre gösterilecek tab'ları belirle
+    const getVisibleTabs = (routeName: string) => {
+        if (isDoctor) {
+            // Doktor için gösterilecek tab'lar
+            return ['index', 'patients', 'appointment', 'messages', 'profile'].includes(routeName);
+        } else {
+            // Hasta için gösterilecek tab'lar
+            return ['index', 'appointments', 'health-data', 'health-metrics', 'profile'].includes(routeName);
+        }
+    };
+
     const patientTabIcons: any = {
         index: (isFocused: boolean)=>(
             <Icons.House
@@ -25,6 +36,17 @@ export default function CustomTabs({
             >
 
             </Icons.House>
+
+            
+        ),
+        'appointments': (isFocused: boolean)=>(
+            <Icons.Calendar
+            size={verticalScale(30)}
+            weight={isFocused ? "fill" : "regular"}
+            color={isFocused ? colors.primary : colors.neutral400}
+            >
+
+            </Icons.Calendar>
 
             
         ),
@@ -138,7 +160,12 @@ export default function CustomTabs({
 
   return (
     <View style={styles.tabbar}>
-      {state.routes.filter(route => tabbarIcons[route.name]).map((route, index) => {
+      {state.routes
+        .filter(route => {
+          // Kullanıcı rolüne göre tab'ları filtrele ve icon'u olan tab'ları göster
+          return getVisibleTabs(route.name) && tabbarIcons[route.name];
+        })
+        .map((route, index) => {
         const { options } = descriptors[route.key];
         const label: any =
           options.tabBarLabel !== undefined
@@ -147,7 +174,8 @@ export default function CustomTabs({
               ? options.title
               : route.name;
 
-        const isFocused = state.index === index;
+        const routeIndex = state.routes.findIndex(r => r.key === route.key);
+        const isFocused = state.index === routeIndex;
 
         const onPress = () => {
           const event = navigation.emit({

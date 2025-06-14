@@ -1,326 +1,534 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
-import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
 import ScreenWrapper from '@/components/ScreenWrapper';
 import Typo from '@/components/Typo';
-import { colors, spacingX, spacingY, radius } from '@/constants/theme';
+import Button from '@/components/Button';
+import { colors, spacingX, spacingY } from '@/constants/theme';
 import * as Icons from 'phosphor-react-native';
 import { verticalScale } from '@/utils/styling';
+import { Appointment, Patient, APPOINTMENT_STATUS_COLORS } from '@/types/appointment';
+import { appointmentService } from '@/services/appointmentService';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/contexts/authContext';
 
-// Example appointment type
-type Appointment = {
-  id: string;
-  patientName: string;
-  date: string;
-  time: string;
-  reason: string;
-  status: 'upcoming' | 'completed' | 'cancelled';
-};
-
-// Dummy data for appointments
-const dummyAppointments: Appointment[] = [
-  {
-    id: '1',
-    patientName: 'Ahmet Yılmaz',
-    date: '24 Haziran 2023',
-    time: '10:00',
-    reason: 'Kontrol muayenesi',
-    status: 'upcoming',
-  },
-  {
-    id: '2',
-    patientName: 'Zeynep Taş',
-    date: '24 Haziran 2023',
-    time: '11:30',
-    reason: 'İlk muayene',
-    status: 'upcoming',
-  },
-  {
-    id: '3',
-    patientName: 'Mehmet Demir',
-    date: '24 Haziran 2023',
-    time: '14:00',
-    reason: 'Sonuç değerlendirme',
-    status: 'upcoming',
-  },
-  {
-    id: '4',
-    patientName: 'Ayla Çelik',
-    date: '23 Haziran 2023',
-    time: '09:30',
-    reason: 'Kontrol muayenesi',
-    status: 'completed',
-  },
-  {
-    id: '5',
-    patientName: 'Kemal Yıldız',
-    date: '22 Haziran 2023',
-    time: '15:00',
-    reason: 'Tetkik sonuçları',
-    status: 'completed',
-  },
-];
-
-const AppointmentScreen = () => {
+const DoctorAppointmentScreen = () => {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'completed'>('upcoming');
+  const [patients, setPatients] = useState<{ [key: string]: Patient }>({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'today' | 'pending' | 'confirmed'>('all');
+
+  // Gerçek doktor ID'sini auth'dan al
+  const currentDoctorId = user?.uid;
 
   useEffect(() => {
-    // Simulate loading appointments
-    setLoading(true);
-    setTimeout(() => {
-      setAppointments(dummyAppointments);
+    loadAppointments();
+  }, [selectedFilter]);
+
+  const loadAppointments = async () => {
+    if (!currentDoctorId) {
+      console.log('No doctor ID available');
       setLoading(false);
-    }, 500);
-  }, []);
-
-  const filteredAppointments = appointments.filter(
-    appointment => {
-      if (activeTab === 'upcoming') {
-        return appointment.status === 'upcoming';
-      } else {
-        return appointment.status === 'completed';
-      }
+      return;
     }
+
+    try {
+      setLoading(true);
+      
+      let filter: any = { doctorId: currentDoctorId };
+      
+      if (selectedFilter === 'today') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        filter.dateFrom = today;
+        filter.dateTo = tomorrow;
+      } else if (selectedFilter === 'pending') {
+        filter.status = 'pending';
+      } else if (selectedFilter === 'confirmed') {
+        filter.status = 'confirmed';
+      }
+
+      const appointmentsData = await appointmentService.getAppointments(filter);
+      setAppointments(appointmentsData);
+
+      // Hasta bilgilerini yükle - önce Patient tablosundan, yoksa randevu bilgilerinden
+      const patientIds = [...new Set(appointmentsData.map(apt => apt.patientId))];
+      const patientsData: { [key: string]: Patient } = {};
+      
+      for (const patientId of patientIds) {
+        const patient = await appointmentService.getPatientById(patientId);
+        if (patient) {
+          patientsData[patientId] = patient;
+        } else {
+          // Patient tablosunda yoksa, randevu bilgilerinden oluştur
+          const appointment = appointmentsData.find(apt => apt.patientId === patientId);
+          if (appointment && appointment.patientName) {
+            patientsData[patientId] = {
+              id: patientId,
+              name: appointment.patientName,
+              email: appointment.patientEmail || '',
+              phone: appointment.patientPhone || '',
+              dateOfBirth: new Date(), // Varsayılan değer
+              gender: 'other' as const,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+          }
+        }
+      }
+      
+      setPatients(patientsData);
+
+    } catch (error) {
+      console.error('Error loading appointments:', error);
+      Alert.alert('Hata', 'Randevular yüklenirken bir hata oluştu.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadAppointments();
+  }, [selectedFilter]);
+
+  const handleFilterChange = (filter: typeof selectedFilter) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedFilter(filter);
+  };
+
+  const handleAppointmentAction = async (appointmentId: string, action: 'confirm' | 'cancel' | 'complete') => {
+    try {
+      let status: Appointment['status'];
+      let message: string;
+      
+      switch (action) {
+        case 'confirm':
+          status = 'confirmed';
+          message = 'Randevu onaylandı';
+          break;
+        case 'cancel':
+          status = 'cancelled';
+          message = 'Randevu iptal edildi';
+          break;
+        case 'complete':
+          status = 'completed';
+          message = 'Randevu tamamlandı';
+          break;
+      }
+
+      await appointmentService.updateAppointmentStatus(appointmentId, status);
+      Alert.alert('Başarılı', message);
+      loadAppointments();
+      
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      Alert.alert('Hata', 'Randevu güncellenirken bir hata oluştu.');
+    }
+  };
+
+  const getStatusColor = (status: Appointment['status']) => {
+    return APPOINTMENT_STATUS_COLORS[status] || colors.textLighter;
+  };
+
+  const getStatusText = (status: Appointment['status']) => {
+    switch (status) {
+      case 'pending': return 'Bekliyor';
+      case 'confirmed': return 'Onaylandı';
+      case 'cancelled': return 'İptal Edildi';
+      case 'completed': return 'Tamamlandı';
+      case 'no-show': return 'Gelmedi';
+      default: return status;
+    }
+  };
+
+  const getTypeText = (type: Appointment['type']) => {
+    switch (type) {
+      case 'consultation': return 'Konsültasyon';
+      case 'follow-up': return 'Kontrol';
+      case 'emergency': return 'Acil';
+      case 'routine-check': return 'Rutin Muayene';
+      default: return type;
+    }
+  };
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  const AppointmentCard = ({ appointment }: { appointment: Appointment }) => {
+    const patient = patients[appointment.patientId];
+    
+    return (
+      <TouchableOpacity 
+        style={styles.appointmentCard}
+        onPress={() => router.push(`/appointment-detail?appointmentId=${appointment.id}`)}
+      >
+        <View style={styles.appointmentHeader}>
+          <View style={styles.patientInfo}>
+            <View style={styles.patientAvatar}>
+              <Icons.User size={verticalScale(24)} color={colors.primary} weight="fill" />
+            </View>
+            <View style={styles.patientDetails}>
+              <Typo size={16} fontWeight="700">
+                {patient?.name || appointment.patientName || 'Hasta Bilgisi Yükleniyor...'}
+              </Typo>
+              <Typo size={12} color={colors.textLighter}>
+                {patient?.phone || appointment.patientPhone || ''}
+              </Typo>
+              {patient?.email || appointment.patientEmail ? (
+                <Typo size={10} color={colors.textLighter}>
+                  {patient?.email || appointment.patientEmail}
+                </Typo>
+              ) : null}
+            </View>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(appointment.status) + '20' }]}>
+            <Typo size={12} color={getStatusColor(appointment.status)} fontWeight="600">
+              {getStatusText(appointment.status)}
+            </Typo>
+          </View>
+        </View>
+
+        <View style={styles.appointmentDetails}>
+          <View style={styles.detailRow}>
+            <Icons.Calendar size={verticalScale(16)} color={colors.primary} />
+            <Typo size={14}>
+              {appointment.date.toLocaleDateString('tr-TR')} - {appointment.date.toLocaleTimeString('tr-TR', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </Typo>
+            {isToday(appointment.date) && (
+              <View style={styles.todayBadge}>
+                <Typo size={10} color={colors.yellow} fontWeight="600">BUGÜN</Typo>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.detailRow}>
+            <Icons.ClipboardText size={verticalScale(16)} color={colors.secondary} />
+            <Typo size={14} color={colors.textLighter}>
+              {getTypeText(appointment.type)} - {appointment.duration} dk
+            </Typo>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Icons.ChatCircle size={verticalScale(16)} color={colors.green} />
+            <Typo size={14} color={colors.textLighter}>
+              {appointment.reason}
+            </Typo>
+          </View>
+
+          {appointment.notes && (
+            <View style={styles.detailRow}>
+              <Icons.Note size={verticalScale(16)} color={colors.yellow} />
+              <Typo size={12} color={colors.textLighter} style={styles.notesText}>
+                {appointment.notes}
+              </Typo>
+            </View>
+          )}
+        </View>
+
+        {appointment.status === 'pending' && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.confirmButton]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                handleAppointmentAction(appointment.id, 'confirm');
+              }}
+            >
+              <Icons.Check size={verticalScale(16)} color={colors.white} weight="bold" />
+              <Typo size={12} color={colors.white} fontWeight="600">Onayla</Typo>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                Alert.alert(
+                  'Randevuyu İptal Et',
+                  'Bu randevuyu iptal etmek istediğinizden emin misiniz?',
+                  [
+                    { text: 'Vazgeç', style: 'cancel' },
+                    { 
+                      text: 'İptal Et', 
+                      style: 'destructive',
+                      onPress: () => handleAppointmentAction(appointment.id, 'cancel')
+                    }
+                  ]
+                );
+              }}
+            >
+              <Icons.X size={verticalScale(16)} color={colors.white} weight="bold" />
+              <Typo size={12} color={colors.white} fontWeight="600">İptal Et</Typo>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {appointment.status === 'confirmed' && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.completeButton]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                handleAppointmentAction(appointment.id, 'complete');
+              }}
+            >
+              <Icons.CheckCircle size={verticalScale(16)} color={colors.white} weight="bold" />
+              <Typo size={12} color={colors.white} fontWeight="600">Tamamla</Typo>
+            </TouchableOpacity>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const FilterTabs = () => (
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      style={styles.filterTabs}
+      contentContainerStyle={styles.filterTabsContent}
+    >
+      {[
+        { key: 'all', label: 'Tümü', icon: Icons.List },
+        { key: 'today', label: 'Bugün', icon: Icons.CalendarCheck },
+        { key: 'pending', label: 'Bekleyen', icon: Icons.Clock },
+        { key: 'confirmed', label: 'Onaylı', icon: Icons.CheckCircle }
+      ].map((filter) => (
+        <TouchableOpacity
+          key={filter.key}
+          style={[
+            styles.filterTab,
+            selectedFilter === filter.key && styles.filterTabActive
+          ]}
+          onPress={() => handleFilterChange(filter.key as any)}
+        >
+          <filter.icon 
+            size={verticalScale(16)} 
+            color={selectedFilter === filter.key ? colors.white : colors.textLighter}
+            weight={selectedFilter === filter.key ? 'fill' : 'regular'}
+          />
+          <Typo 
+            size={14} 
+            color={selectedFilter === filter.key ? colors.white : colors.textLighter}
+            fontWeight={selectedFilter === filter.key ? '600' : '400'}
+          >
+            {filter.label}
+          </Typo>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
   );
 
-  const renderAppointmentItem = (appointment: Appointment) => (
-    <TouchableOpacity 
-      key={appointment.id}
-      style={styles.appointmentCard}
-      onPress={() => console.log('View appointment details', appointment.id)}
-    >
-      <View style={styles.appointmentHeader}>
-        <View style={styles.patientInfo}>
-          <Typo fontWeight="600">{appointment.patientName}</Typo>
-          <Typo size={13} color={colors.neutral400}>{appointment.reason}</Typo>
+  if (loading) {
+    return (
+      <ScreenWrapper>
+        <View style={styles.loadingContainer}>
+          <Typo size={16} color={colors.textLighter}>Randevular yükleniyor...</Typo>
         </View>
-        <View style={[
-          styles.statusBadge, 
-          { backgroundColor: appointment.status === 'upcoming' ? colors.primary + '30' : colors.primaryLight + '30' }
-        ]}>
-          <Typo 
-            size={12} 
-            fontWeight="500" 
-            color={appointment.status === 'upcoming' ? colors.primary : colors.primaryLight}
-          >
-            {appointment.status === 'upcoming' ? 'Yaklaşan' : 'Tamamlandı'}
-          </Typo>
-        </View>
-      </View>
-      
-      <View style={styles.appointmentDetails}>
-        <View style={styles.detailItem}>
-          <Icons.CalendarBlank size={16} color={colors.neutral400} />
-          <Typo size={13} color={colors.neutral300} style={styles.detailText}>
-            {appointment.date}
-          </Typo>
-        </View>
-        <View style={styles.detailItem}>
-          <Icons.Clock size={16} color={colors.neutral400} />
-          <Typo size={13} color={colors.neutral300} style={styles.detailText}>
-            {appointment.time}
-          </Typo>
-        </View>
-      </View>
-      
-      {appointment.status === 'upcoming' && (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={[styles.actionButton, styles.rescheduleButton]}>
-            <Icons.CalendarPlus size={16} color={colors.primary} />
-            <Typo size={12} color={colors.primary} style={styles.actionButtonText}>
-              Yeniden Planla
-            </Typo>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.cancelButton]}>
-            <Icons.X size={16} color={colors.rose} />
-            <Typo size={12} color={colors.rose} style={styles.actionButtonText}>
-              İptal Et
-            </Typo>
-          </TouchableOpacity>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+      </ScreenWrapper>
+    );
+  }
 
   return (
     <ScreenWrapper>
-      <View style={styles.header}>
-        <Typo size={24} fontWeight="700">Randevular</Typo>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => console.log('Add new appointment')}
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Typo size={24} fontWeight="800">Randevularım</Typo>
+          <View style={styles.headerStats}>
+            <View style={styles.statItem}>
+              <Typo size={12} color={colors.textLighter}>Bugün</Typo>
+              <Typo size={16} fontWeight="700" color={colors.primary}>
+                {appointments.filter(apt => isToday(apt.date)).length}
+              </Typo>
+            </View>
+            <View style={styles.statItem}>
+              <Typo size={12} color={colors.textLighter}>Bekleyen</Typo>
+              <Typo size={16} fontWeight="700" color={colors.yellow}>
+                {appointments.filter(apt => apt.status === 'pending').length}
+              </Typo>
+            </View>
+          </View>
+        </View>
+
+        <FilterTabs />
+
+        <ScrollView 
+          style={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
-          <Icons.Plus size={20} color={colors.white} />
-        </TouchableOpacity>
+          {appointments.length > 0 ? (
+            <View style={styles.appointmentsContainer}>
+              {appointments.map((appointment) => (
+                <AppointmentCard key={appointment.id} appointment={appointment} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Icons.Calendar size={verticalScale(60)} color={colors.textLighter} />
+              <Typo size={16} color={colors.textLighter} style={styles.emptyText}>
+                {selectedFilter === 'all' ? 'Henüz randevunuz bulunmuyor' :
+                 selectedFilter === 'today' ? 'Bugün randevunuz bulunmuyor' :
+                 selectedFilter === 'pending' ? 'Bekleyen randevunuz bulunmuyor' :
+                 'Onaylı randevunuz bulunmuyor'}
+              </Typo>
+            </View>
+          )}
+        </ScrollView>
       </View>
-      
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'upcoming' && styles.activeTabButton
-          ]}
-          onPress={() => setActiveTab('upcoming')}
-        >
-          <Typo
-            size={14}
-            fontWeight={activeTab === 'upcoming' ? '600' : 'normal'}
-            color={activeTab === 'upcoming' ? colors.primary : colors.neutral400}
-          >
-            Yaklaşan
-          </Typo>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'completed' && styles.activeTabButton
-          ]}
-          onPress={() => setActiveTab('completed')}
-        >
-          <Typo
-            size={14}
-            fontWeight={activeTab === 'completed' ? '600' : 'normal'}
-            color={activeTab === 'completed' ? colors.primary : colors.neutral400}
-          >
-            Tamamlanan
-          </Typo>
-        </TouchableOpacity>
-      </View>
-      
-      <ScrollView style={styles.container}>
-        {loading ? (
-          <View style={styles.centered}>
-            <Typo>Yükleniyor...</Typo>
-          </View>
-        ) : filteredAppointments.length > 0 ? (
-          <View style={styles.appointmentsList}>
-            {filteredAppointments.map(renderAppointmentItem)}
-          </View>
-        ) : (
-          <View style={styles.centered}>
-            <Icons.Calendar size={48} color={colors.neutral400} weight="duotone" />
-            <Typo style={styles.emptyText}>
-              {activeTab === 'upcoming' ? 'Yaklaşan randevunuz bulunmamaktadır.' : 'Tamamlanan randevunuz bulunmamaktadır.'}
-            </Typo>
-          </View>
-        )}
-      </ScrollView>
     </ScreenWrapper>
   );
 };
 
-export default AppointmentScreen;
+export default DoctorAppointmentScreen;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingHorizontal: spacingX._20,
+    paddingTop: spacingY._20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacingX._20,
-    paddingVertical: spacingY._20,
+    marginBottom: spacingY._20,
   },
-  addButton: {
-    backgroundColor: colors.primary,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabsContainer: {
+  headerStats: {
     flexDirection: 'row',
-    marginHorizontal: spacingX._20,
-    marginBottom: spacingY._15,
-    backgroundColor: colors.neutral800,
-    borderRadius: 12,
-    padding: 4,
+    gap: spacingX._15,
   },
-  tabButton: {
-    flex: 1,
-    paddingVertical: spacingY._10,
+  statItem: {
     alignItems: 'center',
+    backgroundColor: colors.neutral800,
+    paddingHorizontal: spacingX._12,
+    paddingVertical: spacingY._8,
     borderRadius: 8,
   },
-  activeTabButton: {
-    backgroundColor: colors.neutral700,
+  filterTabs: {
+    marginBottom: spacingY._20,
   },
-  appointmentsList: {
-    paddingHorizontal: spacingX._20,
+  filterTabsContent: {
+    paddingHorizontal: spacingX._5,
+    gap: spacingX._10,
+  },
+  filterTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacingX._6,
+    paddingHorizontal: spacingX._15,
+    paddingVertical: spacingY._8,
+    borderRadius: 20,
+    backgroundColor: colors.neutral800,
+  },
+  filterTabActive: {
+    backgroundColor: colors.primary,
+  },
+  content: {
+    flex: 1,
+  },
+  appointmentsContainer: {
+    gap: spacingY._15,
     paddingBottom: spacingY._20,
   },
   appointmentCard: {
-    backgroundColor: colors.neutral900,
-    padding: spacingY._15,
+    backgroundColor: colors.neutral800,
     borderRadius: 12,
-    marginBottom: spacingY._10,
+    padding: spacingY._15,
+    gap: spacingY._12,
   },
   appointmentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacingY._10,
+    alignItems: 'center',
   },
   patientInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacingX._12,
+    flex: 1,
+  },
+  patientAvatar: {
+    width: verticalScale(40),
+    height: verticalScale(40),
+    borderRadius: verticalScale(20),
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  patientDetails: {
     flex: 1,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: spacingX._10,
+    paddingVertical: spacingY._5,
+    borderRadius: 12,
   },
   appointmentDetails: {
-    flexDirection: 'row',
-    marginBottom: spacingY._10,
+    gap: spacingY._8,
   },
-  detailItem: {
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacingX._15,
+    gap: spacingX._8,
   },
-  detailText: {
-    marginLeft: 4,
+  todayBadge: {
+    backgroundColor: colors.yellow + '20',
+    paddingHorizontal: spacingX._6,
+    paddingVertical: spacingY._2,
+    borderRadius: 4,
+    marginLeft: spacingX._8,
+  },
+  notesText: {
+    fontStyle: 'italic',
+    flex: 1,
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: colors.neutral800,
-    paddingTop: spacingY._10,
+    gap: spacingX._10,
+    marginTop: spacingY._5,
   },
   actionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
+    justifyContent: 'center',
+    gap: spacingX._6,
+    paddingVertical: spacingY._10,
+    borderRadius: 8,
   },
-  actionButtonText: {
-    marginLeft: 4,
-  },
-  rescheduleButton: {
-    backgroundColor: colors.primary + '15',
+  confirmButton: {
+    backgroundColor: colors.green,
   },
   cancelButton: {
-    backgroundColor: colors.rose + '15',
+    backgroundColor: colors.rose,
   },
-  centered: {
+  completeButton: {
+    backgroundColor: colors.primary,
+  },
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: spacingY._60,
+    paddingVertical: spacingY._40,
+    gap: spacingY._15,
   },
   emptyText: {
-    marginTop: spacingY._10,
-    color: colors.neutral400,
     textAlign: 'center',
   },
 });

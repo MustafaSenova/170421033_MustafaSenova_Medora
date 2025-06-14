@@ -28,9 +28,14 @@ const ProfileScreen = () => {
 };
 
 const DoctorProfileScreen = () => {
-  const { user, logout, updateProfileImage } = useAuth();
+  const { user, logout, updateProfileImage, refreshUserData } = useAuth();
   const [profileImage, setProfileImage] = useState<string | null>(user?.image || null);
   const [imageUploading, setImageUploading] = useState(false);
+
+  // Refresh user data when component mounts
+  useEffect(() => {
+    refreshUserData();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -101,13 +106,18 @@ const DoctorProfileScreen = () => {
       
       <View style={styles.nameContainer}>
         <Typo size={20} fontWeight="600">
-          {user?.firstName} {user?.lastName}
+          {user?.firstName && user?.lastName 
+            ? `${user.firstName} ${user.lastName}`
+            : user?.firstName 
+              ? user.firstName
+              : user?.email?.split('@')[0] || 'Doktor'
+          }
         </Typo>
         <Typo size={14} color={colors.primary}>
-          {user?.doctorProfile?.specialization}
+          {user?.doctorProfile?.specialization || 'Uzmanlık Belirtilmemiş'}
         </Typo>
         <Typo size={12} color={colors.textLighter}>
-          {user?.doctorProfile?.hospital}
+          {user?.doctorProfile?.hospital || 'Hastane Belirtilmemiş'}
         </Typo>
         <Typo size={12} color={colors.textLighter}>
           {user?.email}

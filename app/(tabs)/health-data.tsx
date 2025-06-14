@@ -21,6 +21,12 @@ import {
   connectGoogleFit as realConnectGoogleFit,
   fetchAllHealthData as realFetchAllHealthData
 } from '@/utils/healthData';
+// Samsung Health entegrasyonu
+import { 
+  samsungHealthService,
+  SamsungHealthEcgData,
+  SamsungHealthSpo2Data
+} from '@/utils/samsungHealthData';
 // Import GoogleFit for authorization check
 import GoogleFit from 'react-native-google-fit';
 
@@ -66,6 +72,14 @@ const HealthDataScreen = () => {
   const [healthData, setHealthData] = useState<HealthDataResponse | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
+  
+  // Samsung Health states
+  const [samsungConnected, setSamsungConnected] = useState(false);
+  const [samsungLoading, setSamsungLoading] = useState(false);
+  const [ecgData, setEcgData] = useState<SamsungHealthEcgData[]>([]);
+  const [spo2Data, setSpo2Data] = useState<SamsungHealthSpo2Data[]>([]);
+  const [supportedSensors, setSupportedSensors] = useState<string[]>([]);
+  const [isMeasuring, setIsMeasuring] = useState({ ecg: false, spo2: false });
 
   // Google Fit bağlantısını sağlama
   const handleConnectGoogleFit = async () => {
@@ -111,6 +125,74 @@ const HealthDataScreen = () => {
     }
   };
 
+  // Samsung Health bağlantısı
+  const handleConnectSamsungHealth = async () => {
+    setSamsungLoading(true);
+    try {
+      // Samsung Health SDK'sına bağlan
+      await samsungHealthService.connect();
+      setSamsungConnected(true);
+      
+      // Desteklenen sensörleri al
+      const capabilities = await samsungHealthService.getCapabilities();
+      const sensors = [];
+      if (capabilities.ecgSupported) sensors.push('ECG');
+      if (capabilities.spo2Supported) sensors.push('SpO2');
+      if (capabilities.heartRateSupported) sensors.push('Heart Rate');
+      setSupportedSensors(sensors);
+      
+      Alert.alert('Başarılı', 'Samsung Health\'e başarıyla bağlandı!');
+      console.log('Desteklenen sensörler:', sensors);
+    } catch (error) {
+      console.error('Samsung Health bağlantı hatası:', error);
+      Alert.alert('Hata', 'Samsung Health bağlantısında hata oluştu.');
+    } finally {
+      setSamsungLoading(false);
+    }
+  };
+
+  // EKG ölçümü başlat/durdur
+  const handleECGMeasurement = async () => {
+    if (isMeasuring.ecg) {
+      try {
+        await samsungHealthService.stopEcgMeasurement();
+        setIsMeasuring(prev => ({ ...prev, ecg: false }));
+        Alert.alert('EKG Ölçümü', 'EKG ölçümü durduruldu.');
+      } catch (error) {
+        Alert.alert('Hata', 'EKG ölçümü durdurulamadı.');
+      }
+    } else {
+      try {
+        await samsungHealthService.startEcgMeasurement();
+        setIsMeasuring(prev => ({ ...prev, ecg: true }));
+        Alert.alert('EKG Ölçümü', 'EKG ölçümü başlatıldı. Saatten bekleyin...');
+      } catch (error) {
+        Alert.alert('Hata', 'EKG ölçümü başlatılamadı.');
+      }
+    }
+  };
+
+  // SpO2 ölçümü başlat/durdur
+  const handleSpO2Measurement = async () => {
+    if (isMeasuring.spo2) {
+      try {
+        await samsungHealthService.stopSpo2Measurement();
+        setIsMeasuring(prev => ({ ...prev, spo2: false }));
+        Alert.alert('SpO2 Ölçümü', 'SpO2 ölçümü durduruldu.');
+      } catch (error) {
+        Alert.alert('Hata', 'SpO2 ölçümü durdurulamadı.');
+      }
+    } else {
+      try {
+        await samsungHealthService.startSpo2Measurement();
+        setIsMeasuring(prev => ({ ...prev, spo2: true }));
+        Alert.alert('SpO2 Ölçümü', 'SpO2 ölçümü başlatıldı. Saatten bekleyin...');
+      } catch (error) {
+        Alert.alert('Hata', 'SpO2 ölçümü başlatılamadı.');
+      }
+    }
+  };
+
   // İlk yükleme
   useEffect(() => {
     // Uygulama başlangıcında Google Fit bağlantı durumunu kontrol et
@@ -134,6 +216,32 @@ const HealthDataScreen = () => {
     };
     
     checkGoogleFitConnection();
+
+    // Samsung Health event listener'ları
+    const ecgListener = samsungHealthService.addListener('onEcgData', (data: SamsungHealthEcgData) => {
+      setEcgData(prev => [...prev, data]);
+      console.log('EKG verisi alındı:', data);
+    });
+
+    const spo2Listener = samsungHealthService.addListener('onSpo2Data', (data: SamsungHealthSpo2Data) => {
+      setSpo2Data(prev => [...prev, data]);
+      console.log('SpO2 verisi alındı:', data);
+    });
+
+    const ecgErrorListener = samsungHealthService.addListener('onEcgError', (event: any) => {
+      Alert.alert('EKG Hatası', event.error);
+    });
+
+    const spo2ErrorListener = samsungHealthService.addListener('onSpo2Error', (event: any) => {
+      Alert.alert('SpO2 Hatası', event.error);
+    });
+
+    return () => {
+      ecgListener.remove();
+      spo2Listener.remove();
+      ecgErrorListener.remove();
+      spo2ErrorListener.remove();
+    };
   }, []);
 
   // Yenileme işlemi
@@ -635,16 +743,27 @@ const HealthDataScreen = () => {
           )}
         </View>
         
-        {!isConnected ? (
+        {!isConnected && !samsungConnected ? (
           <View style={styles.connectContainer}>
             <Typo size={16} color={colors.textLighter} style={styles.infoText}>
-              Sağlık verilerinizi görmek için Google Fit'e bağlanın.
+              Sağlık verilerinizi görmek için Google Fit veya Samsung Health'e bağlanın.
             </Typo>
             <Button onPress={handleConnectGoogleFit} loading={loading} style={styles.connectButton}>
               <Typo fontWeight="700" color={colors.black} size={18}>
                 Google Fit'e Bağlan
               </Typo>
             </Button>
+            <View style={{ marginTop: spacingY._15 }}>
+              <Button 
+                onPress={handleConnectSamsungHealth} 
+                loading={samsungLoading} 
+                style={StyleSheet.flatten([styles.connectButton, { backgroundColor: colors.primary }])}
+              >
+                <Typo fontWeight="700" color={colors.white} size={18}>
+                  Samsung Health'e Bağlan
+                </Typo>
+              </Button>
+            </View>
           </View>
         ) : showDetailedAnalysis ? (
           // Detaylı analiz görünümü

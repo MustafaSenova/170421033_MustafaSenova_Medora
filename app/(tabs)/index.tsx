@@ -1,5 +1,5 @@
 // app/(tabs)/predict.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, ScrollView, Switch, StyleSheet, TouchableOpacity } from 'react-native';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
@@ -24,8 +24,13 @@ const HomeScreen = () => {
 };
 
 const DoctorHomeScreen = () => {
-  const { user } = useAuth();
+  const { user, refreshUserData } = useAuth();
   const router = useRouter();
+
+  // Refresh user data when component mounts
+  useEffect(() => {
+    refreshUserData();
+  }, []);
 
   const doctorMenuItems = [
     {
@@ -66,11 +71,16 @@ const DoctorHomeScreen = () => {
             Hoş Geldiniz,
           </Typo>
           <Typo size={22} fontWeight="600" color={colors.primary}>
-            Dr. {user?.firstName} {user?.lastName}
+            {user?.firstName && user?.lastName 
+              ? `Dr. ${user.firstName} ${user.lastName}`
+              : user?.firstName 
+                ? `Dr. ${user.firstName}`
+                : 'Dr.'
+            }
           </Typo>
           {user?.doctorProfile?.specialization && (
             <Typo size={14} color={colors.textLighter}>
-              {user.doctorProfile.specialization} • {user?.doctorProfile?.hospital}
+              {user.doctorProfile.specialization} • {user?.doctorProfile?.hospital || 'Hastane'}
             </Typo>
           )}
         </View>

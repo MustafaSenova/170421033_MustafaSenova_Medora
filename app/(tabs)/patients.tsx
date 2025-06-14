@@ -1,4 +1,4 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import ScreenWrapper from '@/components/ScreenWrapper';
 import Typo from '@/components/Typo';
@@ -6,16 +6,18 @@ import { colors, spacingX, spacingY, radius } from '@/constants/theme';
 import * as Icons from 'phosphor-react-native';
 import { verticalScale } from '@/utils/styling';
 import { useAuth } from '@/contexts/authContext';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { firestore } from '@/config/firebase';
+import { appointmentService } from '@/services/appointmentService';
+import { Appointment } from '@/types/appointment';
 
-// Example patient type
+// Patient type derived from appointments
 type PatientType = {
   id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  lastVisit?: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  lastVisit?: Date;
+  totalAppointments: number;
+  upcomingAppointments: number;
 };
 
 const PatientsScreen = () => {
@@ -23,33 +25,55 @@ const PatientsScreen = () => {
   const [patients, setPatients] = useState<PatientType[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch patients data
+  // Fetch patients data from appointments
   useEffect(() => {
     const fetchPatients = async () => {
       if (!user?.uid) return;
       
       setLoading(true);
       try {
-        // This is just a placeholder for demonstration
-        // In a real app, you'd query patients associated with this doctor
-        const patientsRef = collection(firestore, "patients");
-        const querySnapshot = await getDocs(patientsRef);
+        // Get all appointments for this doctor
+        const appointments = await appointmentService.getAppointments({
+          doctorId: user.uid
+        });
+
+        // Group appointments by patient
+        const patientMap = new Map<string, PatientType>();
         
-        const patientsList: PatientType[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          patientsList.push({
-            id: doc.id,
-            firstName: data.firstName || '',
-            lastName: data.lastName || '',
-            email: data.email || '',
-            lastVisit: 'N/A',
-          });
+        appointments.forEach((appointment: Appointment) => {
+          const patientId = appointment.patientId;
+          
+          if (patientMap.has(patientId)) {
+            const patient = patientMap.get(patientId)!;
+            patient.totalAppointments++;
+            
+            // Update last visit if this appointment is more recent
+            if (appointment.status === 'completed' && 
+                (!patient.lastVisit || appointment.date > patient.lastVisit)) {
+              patient.lastVisit = appointment.date;
+            }
+            
+            // Count upcoming appointments
+            if (appointment.status === 'confirmed' && appointment.date > new Date()) {
+              patient.upcomingAppointments++;
+            }
+          } else {
+            patientMap.set(patientId, {
+              id: patientId,
+              name: appointment.patientName || `Hasta ${patientId.slice(-4)}`,
+              email: appointment.patientEmail,
+              phone: appointment.patientPhone,
+              lastVisit: appointment.status === 'completed' ? appointment.date : undefined,
+              totalAppointments: 1,
+              upcomingAppointments: appointment.status === 'confirmed' && appointment.date > new Date() ? 1 : 0
+            });
+          }
         });
         
-        setPatients(patientsList);
+        setPatients(Array.from(patientMap.values()));
       } catch (error) {
         console.error('Error fetching patients:', error);
+        Alert.alert('Hata', 'Hasta bilgileri yüklenirken bir hata oluştu.');
       } finally {
         setLoading(false);
       }
@@ -68,8 +92,25 @@ const PatientsScreen = () => {
         <Icons.User size={24} color={colors.primary} weight="duotone" />
       </View>
       <View style={styles.patientInfo}>
-        <Typo fontWeight="600">{patient.firstName} {patient.lastName}</Typo>
-        <Typo size={14} color={colors.neutral400}>{patient.email}</Typo>
+        <Typo fontWeight="600">{patient.name}</Typo>
+        {patient.email && (
+          <Typo size={14} color={colors.neutral400}>{patient.email}</Typo>
+        )}
+        <View style={styles.patientStats}>
+          <Typo size={12} color={colors.neutral400}>
+            {patient.totalAppointments} randevu
+          </Typo>
+          {patient.upcomingAppointments > 0 && (
+            <Typo size={12} color={colors.primary}>
+              • {patient.upcomingAppointments} yaklaşan
+            </Typo>
+          )}
+        </View>
+        {patient.lastVisit && (
+          <Typo size={12} color={colors.neutral500}>
+            Son ziyaret: {patient.lastVisit.toLocaleDateString('tr-TR')}
+          </Typo>
+        )}
       </View>
       <Icons.CaretRight size={20} color={colors.neutral400} />
     </TouchableOpacity>
@@ -79,12 +120,11 @@ const PatientsScreen = () => {
     <ScreenWrapper>
       <View style={styles.header}>
         <Typo size={24} fontWeight="700">Hastalarım</Typo>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => console.log('Add new patient')}
-        >
-          <Icons.Plus size={20} color={colors.white} />
-        </TouchableOpacity>
+        <View style={styles.headerStats}>
+          <Typo size={14} color={colors.neutral400}>
+            {patients.length} hasta
+          </Typo>
+        </View>
       </View>
       
       <ScrollView style={styles.container}>
@@ -99,7 +139,10 @@ const PatientsScreen = () => {
         ) : (
           <View style={styles.centered}>
             <Icons.UsersFour size={48} color={colors.neutral400} weight="duotone" />
-            <Typo style={styles.emptyText}>Henüz hasta kaydınız bulunmamaktadır.</Typo>
+            <Typo style={styles.emptyText}>Henüz hasta randevunuz bulunmamaktadır.</Typo>
+            <Typo size={14} color={colors.neutral500} style={styles.emptySubtext}>
+              Randevular sayfasından randevu taleplerini yönetebilirsiniz.
+            </Typo>
           </View>
         )}
       </ScrollView>
@@ -120,13 +163,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacingX._20,
     paddingVertical: spacingY._20,
   },
-  addButton: {
-    backgroundColor: colors.primary,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerStats: {
+    alignItems: 'flex-end',
   },
   patientsList: {
     paddingHorizontal: spacingX._20,
@@ -151,16 +189,27 @@ const styles = StyleSheet.create({
   },
   patientInfo: {
     flex: 1,
+    gap: spacingY._2,
+  },
+  patientStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacingX._5,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: spacingY._60,
+    paddingHorizontal: spacingX._20,
   },
   emptyText: {
     marginTop: spacingY._10,
     color: colors.neutral400,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    marginTop: spacingY._5,
     textAlign: 'center',
   },
 }); 

@@ -193,6 +193,7 @@ export type AuthContextType = {
     userId: string,
     imageUri: string
   ) => Promise<{ success: boolean; msg?: string }>;
+  refreshUserData: () => Promise<void>;
   logout: () => Promise<{ success: boolean; msg?: string }>;
 };
 
