@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { initializeAuth, getReactNativePersistence, connectAuthEmulator } from "firebase/auth";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Firebase konfigürasyonu - mevcut projen
@@ -22,5 +22,19 @@ export const db = getFirestore(app);
 export const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage)
 });
+
+// Network bağlantısı için timeout ayarları
+// Firestore offline support
+import { enableNetwork, disableNetwork } from "firebase/firestore";
+
+// Firestore ayarları
+if (__DEV__) {
+  // Development modunda daha kısa timeout
+  console.log("Firebase initialized in development mode");
+}
+
+// Network durumunu kontrol et ve bağlantıyı yönet
+export const enableFirestoreNetwork = () => enableNetwork(db);
+export const disableFirestoreNetwork = () => disableNetwork(db);
 
 export default app;

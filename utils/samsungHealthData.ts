@@ -2,19 +2,23 @@ import { NativeModules, NativeEventEmitter, EmitterSubscription, Platform } from
 
 // Web fallback için mock module
 const MockSamsungHealthModule = {
-  connectService: () => Promise.resolve({ success: true, message: "Mock Samsung Health connected (Web)" }),
-  disconnectService: () => Promise.resolve({ success: true, message: "Mock Samsung Health disconnected" }),
-  getCapabilities: () => Promise.resolve({ 
-    success: true, 
-    data: { ecgSupported: true, spo2Supported: true, heartRateSupported: true } 
-  }),
-  startEcgMeasurement: () => Promise.resolve({ success: true, message: "Mock ECG started" }),
-  stopEcgMeasurement: () => Promise.resolve({ success: true, message: "Mock ECG stopped" }),
-  startSpo2Measurement: () => Promise.resolve({ success: true, message: "Mock SpO2 started" }),
-  stopSpo2Measurement: () => Promise.resolve({ success: true, message: "Mock SpO2 stopped" }),
-  startHeartRateTracking: () => Promise.resolve({ success: true, message: "Mock Heart Rate started" }),
-  stopHeartRateTracking: () => Promise.resolve({ success: true, message: "Mock Heart Rate stopped" }),
-  setUserProfile: () => Promise.resolve({ success: true, message: "Mock User Profile set" }),
+  connectService: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  disconnectService: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  getCapabilities: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  startEcgMeasurement: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  stopEcgMeasurement: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  startSpo2Measurement: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  stopSpo2Measurement: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  startHeartRateTracking: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  stopHeartRateTracking: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  setUserProfile: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  getHistoricalHeartRateData: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  getHistoricalStepsData: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  getHistoricalSleepData: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  getHistoricalSpo2Data: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  getTodayHeartRateData: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  getTodayStepsData: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
+  getTodaySpo2Data: () => Promise.resolve({ success: false, message: "Samsung Health not available on web" }),
 };
 
 const SamsungHealthModule = Platform.OS === 'web' ? MockSamsungHealthModule : NativeModules.SamsungHealthModule;
@@ -29,7 +33,7 @@ export interface SamsungHealthEcgData {
 export interface SamsungHealthSpo2Data {
   timestamp: number;
   status: string;
-  spo2?: number;
+  oxygenSaturation?: number;
 }
 
 export interface SamsungHealthHeartRateData {
@@ -37,6 +41,26 @@ export interface SamsungHealthHeartRateData {
   heartRate?: number;
   status: string;
   ibiList?: number[];
+}
+
+export interface SamsungHealthStepsData {
+  timestamp: number;
+  steps: number;
+  date: string;
+}
+
+export interface SamsungHealthSleepData {
+  timestamp: number;
+  sleepDuration: number; // minutes
+  sleepQuality?: string;
+  date: string;
+}
+
+export interface SamsungHealthHistoricalData {
+  heartRate: SamsungHealthHeartRateData[];
+  steps: SamsungHealthStepsData[];
+  sleep: SamsungHealthSleepData[];
+  spo2: SamsungHealthSpo2Data[];
 }
 
 export interface SamsungHealthCapabilities {
@@ -125,20 +149,6 @@ export class SamsungHealthService {
     try {
       const result = await SamsungHealthModule.startEcgMeasurement();
       console.log('ECG measurement result:', result.message);
-      
-      // Web'de mock data simülasyonu
-      if (Platform.OS === 'web') {
-        setTimeout(() => {
-          const mockEcgData = {
-            timestamp: Date.now(),
-            status: 'MEASUREMENT_COMPLETED',
-            ecgData: Array.from({ length: 100 }, (_, i) => 
-              Math.round(Math.sin(i * 0.1) * 100 + Math.random() * 20)
-            )
-          };
-          this.simulateEvent('onEcgData', mockEcgData);
-        }, 2000);
-      }
     } catch (error) {
       console.error('Failed to start ECG measurement:', error);
       throw error;
@@ -165,18 +175,6 @@ export class SamsungHealthService {
     try {
       const result = await SamsungHealthModule.startSpo2Measurement();
       console.log('SpO2 measurement result:', result.message);
-      
-      // Web'de mock data simülasyonu
-      if (Platform.OS === 'web') {
-        setTimeout(() => {
-          const mockSpo2Data = {
-            timestamp: Date.now(),
-            status: 'MEASUREMENT_COMPLETED',
-            spo2: 98
-          };
-          this.simulateEvent('onSpo2Data', mockSpo2Data);
-        }, 3000);
-      }
     } catch (error) {
       console.error('Failed to start SpO2 measurement:', error);
       throw error;
@@ -203,22 +201,6 @@ export class SamsungHealthService {
     try {
       const result = await SamsungHealthModule.startHeartRateTracking();
       console.log('Heart rate tracking result:', result.message);
-      
-      // Web'de mock data simülasyonu
-      if (Platform.OS === 'web') {
-        const heartRateInterval = setInterval(() => {
-          const mockHeartRateData = {
-            timestamp: Date.now(),
-            heartRate: Math.floor(Math.random() * 20) + 72, // 72-92 BPM
-            status: 'MEASUREMENT_COMPLETED',
-            ibiList: Array.from({ length: 5 }, () => Math.floor(Math.random() * 200) + 600) // 600-800ms IBI
-          };
-          this.simulateEvent('onHeartRateData', mockHeartRateData);
-        }, 5000);
-        
-        // Store interval for cleanup
-        (this as any).mockHeartRateInterval = heartRateInterval;
-      }
     } catch (error) {
       console.error('Failed to start heart rate tracking:', error);
       throw error;
@@ -232,32 +214,9 @@ export class SamsungHealthService {
     try {
       const result = await SamsungHealthModule.stopHeartRateTracking();
       console.log('Heart rate tracking stopped:', result.message);
-      
-      // Web'de mock interval'ı temizle
-      if (Platform.OS === 'web' && (this as any).mockHeartRateInterval) {
-        clearInterval((this as any).mockHeartRateInterval);
-        (this as any).mockHeartRateInterval = null;
-      }
     } catch (error) {
       console.error('Failed to stop heart rate tracking:', error);
       throw error;
-    }
-  }
-
-  /**
-   * Simulate event for web platform
-   */
-  private simulateEvent(eventType: SamsungHealthEventType, data: any): void {
-    if (Platform.OS === 'web') {
-      // Web'de event listener'ları manuel olarak çağır
-      const listeners = this.eventListeners.get(eventType) || [];
-      listeners.forEach(subscription => {
-        // Web'de subscription'ın listener'ını çağır
-        if (subscription && typeof subscription.remove === 'function') {
-          // Native event emitter'ı kullan
-          this.eventEmitter.emit(eventType, data);
-        }
-      });
     }
   }
 
@@ -411,6 +370,204 @@ export class SamsungHealthService {
         return 'Unreliable heart rate data';
       default:
         return `Unknown heart rate status: ${status}`;
+    }
+  }
+
+  /**
+   * Get historical heart rate data
+   */
+  async getHistoricalHeartRateData(startDate: Date, endDate: Date): Promise<SamsungHealthHeartRateData[]> {
+    try {
+      if (!this.isConnected) {
+        throw new Error('Samsung Health service not connected');
+      }
+
+      const result = await SamsungHealthModule.getHistoricalHeartRateData(
+        startDate.getTime(),
+        endDate.getTime()
+      );
+      
+      if (result.success) {
+        return result.data || [];
+      } else {
+        throw new Error(result.message || 'Failed to get historical heart rate data');
+      }
+    } catch (error) {
+      console.error('Failed to get historical heart rate data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get historical steps data
+   */
+  async getHistoricalStepsData(startDate: Date, endDate: Date): Promise<SamsungHealthStepsData[]> {
+    try {
+      if (!this.isConnected) {
+        throw new Error('Samsung Health service not connected');
+      }
+
+      const result = await SamsungHealthModule.getHistoricalStepsData(
+        startDate.getTime(),
+        endDate.getTime()
+      );
+      
+      if (result.success) {
+        return result.data || [];
+      } else {
+        throw new Error(result.message || 'Failed to get historical steps data');
+      }
+    } catch (error) {
+      console.error('Failed to get historical steps data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get historical sleep data
+   */
+  async getHistoricalSleepData(startDate: Date, endDate: Date): Promise<SamsungHealthSleepData[]> {
+    try {
+      if (!this.isConnected) {
+        throw new Error('Samsung Health service not connected');
+      }
+
+      const result = await SamsungHealthModule.getHistoricalSleepData(
+        startDate.getTime(),
+        endDate.getTime()
+      );
+      
+      if (result.success) {
+        return result.data || [];
+      } else {
+        throw new Error(result.message || 'Failed to get historical sleep data');
+      }
+    } catch (error) {
+      console.error('Failed to get historical sleep data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get historical SpO2 data
+   */
+  async getHistoricalSpo2Data(startDate: Date, endDate: Date): Promise<SamsungHealthSpo2Data[]> {
+    try {
+      if (!this.isConnected) {
+        throw new Error('Samsung Health service not connected');
+      }
+
+      const result = await SamsungHealthModule.getHistoricalSpo2Data(
+        startDate.getTime(),
+        endDate.getTime()
+      );
+      
+      if (result.success) {
+        return result.data || [];
+      } else {
+        throw new Error(result.message || 'Failed to get historical SpO2 data');
+      }
+    } catch (error) {
+      console.error('Failed to get historical SpO2 data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all historical data at once
+   */
+  async getAllHistoricalData(startDate: Date, endDate: Date): Promise<SamsungHealthHistoricalData> {
+    try {
+      const [heartRate, steps, sleep, spo2] = await Promise.all([
+        this.getHistoricalHeartRateData(startDate, endDate),
+        this.getHistoricalStepsData(startDate, endDate),
+        this.getHistoricalSleepData(startDate, endDate),
+        this.getHistoricalSpo2Data(startDate, endDate)
+      ]);
+
+      return {
+        heartRate,
+        steps,
+        sleep,
+        spo2
+      };
+    } catch (error) {
+      console.error('Failed to get all historical data:', error);
+      return {
+        heartRate: [],
+        steps: [],
+        sleep: [],
+        spo2: []
+      };
+    }
+  }
+
+  /**
+   * Get today's heart rate data
+   */
+  async getTodayHeartRateData(): Promise<SamsungHealthHeartRateData[]> {
+    try {
+      if (!this.isConnected) {
+        throw new Error('Samsung Health service not connected');
+      }
+
+      const result = await SamsungHealthModule.getTodayHeartRateData();
+      
+      if (result.success) {
+        return result.data || [];
+      } else {
+        throw new Error(result.message || 'Failed to get today\'s heart rate data');
+      }
+    } catch (error) {
+      console.error('Failed to get today\'s heart rate data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get today's steps data
+   */
+  async getTodayStepsData(): Promise<{ steps: number; timestamp: number }> {
+    try {
+      if (!this.isConnected) {
+        throw new Error('Samsung Health service not connected');
+      }
+
+      const result = await SamsungHealthModule.getTodayStepsData();
+      
+      if (result.success) {
+        return {
+          steps: result.steps || 0,
+          timestamp: result.timestamp || Date.now()
+        };
+      } else {
+        throw new Error(result.message || 'Failed to get today\'s steps data');
+      }
+    } catch (error) {
+      console.error('Failed to get today\'s steps data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get today's SpO2 data
+   */
+  async getTodaySpo2Data(): Promise<SamsungHealthSpo2Data[]> {
+    try {
+      if (!this.isConnected) {
+        throw new Error('Samsung Health service not connected');
+      }
+
+      const result = await SamsungHealthModule.getTodaySpo2Data();
+      
+      if (result.success) {
+        return result.data || [];
+      } else {
+        throw new Error(result.message || 'Failed to get today\'s SpO2 data');
+      }
+    } catch (error) {
+      console.error('Failed to get today\'s SpO2 data:', error);
+      throw error;
     }
   }
 }

@@ -12,7 +12,19 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<UserType>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isNavigationReady, setIsNavigationReady] = useState(false);
     const router = useRouter();
+    
+    // Navigation ready olduğunda set et
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsNavigationReady(true);
+        }, 100); // Kısa bir delay ile navigation'ın hazır olmasını bekle
+        
+        return () => clearTimeout(timer);
+    }, []);
+    
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
@@ -24,46 +36,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 });
 
                 try {
-                    // Kullanıcı verilerini al ve role'ü kontrol et
-                    const userData = await getUserData(firebaseUser.uid);
+                    // Kullanıcı verilerini al ve role'ü kontrol et - timeout ekle
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Request timeout')), 10000)
+                    );
                     
-                    if (userData?.role === 'doctor') {
-                        // Doktor ise doğrudan tabs'a yönlendir
-                        console.log("Doktor girişi yapıldı, rol:", userData.role);
-                        router.replace("/(tabs)");
-                    } else if (userData?.role === 'patient') {
-                        // Hasta ise health profile kontrolü yap
-                        const docRef = doc(db, "patients", firebaseUser.uid);
-                        const docSnap = await getDoc(docRef);
-                        
-                        if (docSnap.exists()) {
-                            const patientData = docSnap.data();
-                            if (!patientData.healthProfile) {
-                                // Health profile yoksa onboarding'e yönlendir
-                                router.replace("/(auth)/onboarding-modal");
+                    const userData = await Promise.race([
+                        getUserData(firebaseUser.uid),
+                        timeoutPromise
+                    ]) as UserType;
+                    
+                    if (isNavigationReady) {
+                        if (userData?.role === 'doctor') {
+                            // Doktor ise doğrudan tabs'a yönlendir
+                            console.log("Doktor girişi yapıldı, rol:", userData.role);
+                            router.replace("/(tabs)");
+                        } else if (userData?.role === 'patient') {
+                            // Hasta ise health profile kontrolü yap
+                            const docRef = doc(db, "patients", firebaseUser.uid);
+                            const docSnap = await getDoc(docRef);
+                            
+                            if (docSnap.exists()) {
+                                const patientData = docSnap.data();
+                                if (!patientData.healthProfile) {
+                                    // Health profile yoksa onboarding'e yönlendir
+                                    router.replace("/(auth)/onboarding-modal");
+                                } else {
+                                    router.replace("/(tabs)");
+                                }
                             } else {
                                 router.replace("/(tabs)");
                             }
                         } else {
-                            router.replace("/(tabs)");
+                            // Kullanıcı bulunamadıysa welcome sayfasına yönlendir
+                            console.log("Kullanıcı bulunamadı, welcome sayfasına yönlendiriliyor");
+                            router.replace("/(auth)/welcome");
                         }
-                    } else {
-                        // Kullanıcı bulunamadıysa welcome sayfasına yönlendir
-                        console.log("Kullanıcı bulunamadı, welcome sayfasına yönlendiriliyor");
-                        router.replace("/(auth)/welcome");
                     }
                 } catch (error) {
                     console.error("Kullanıcı verisi alınırken hata:", error);
-                    router.replace("/(auth)/welcome");
+                    if (isNavigationReady) {
+                        router.replace("/(auth)/welcome");
+                    }
+                } finally {
+                    setIsLoading(false);
                 }
             } else {
                 setUser(null);
-                router.replace("/(auth)/welcome");
+                setIsLoading(false);
+                if (isNavigationReady) {
+                    router.replace("/(auth)/welcome");
+                }
             }
         });
 
         return () => unsub();
-    }, []);
+    }, [isNavigationReady]);
 
     const login = async (email: string, password: string) => {
         try {
@@ -78,6 +106,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             if(msg.includes("(auth/invalid-email)")){
                 msg= "Hatalı email";
+            }
+            if(msg.includes("(auth/network-request-failed)")){
+                msg= "İnternet bağlantısı yok. Lütfen bağlantınızı kontrol edin.";
+            }
+            if(msg.includes("timeout")){
+                msg= "Bağlantı zaman aşımına uğradı. Tekrar deneyin.";
             }
             return { success: false, msg }
         }
@@ -340,7 +374,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateHealthProfile,
         updateProfileImage,
         refreshUserData,
-        logout
+        logout,
+        isLoading
     }
 
     return (

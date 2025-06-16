@@ -195,6 +195,7 @@ export type AuthContextType = {
   ) => Promise<{ success: boolean; msg?: string }>;
   refreshUserData: () => Promise<void>;
   logout: () => Promise<{ success: boolean; msg?: string }>;
+  isLoading: boolean;
 };
 
 export type ResponseType = {

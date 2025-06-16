@@ -20,7 +20,9 @@
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.BODY_SENSORS"
+        "android.permission.BODY_SENSORS",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
       ],
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,
