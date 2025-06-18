@@ -2,6 +2,24 @@ import { HealthAIService } from './healthAI';
 import { MockAIService } from './mockAI';
 import { HealthContext, AIHealthResponse, ChatMessage } from '../types/health';
 
+// API key'i async storage veya direct olarak almak için
+const getApiKey = () => {
+  // Öncelikle process.env'den dene
+  try {
+    if (typeof process !== 'undefined' && process.env && process.env.OPENAI_API_KEY) {
+      return process.env.OPENAI_API_KEY;
+    }
+  } catch (e) {
+    console.log('Process.env not available');
+  }
+  
+  // Eğer environment variable çalışmıyorsa, buraya key'inizi ekleyebilirsiniz
+  // GÜVENLIK: Production'da mutlaka environment variable kullanın!
+  const HARDCODED_API_KEY = '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'; // Gerçek OpenAI key'inizi buraya yazın (sk- ile başlamalı)
+  
+  return HARDCODED_API_KEY;
+};
+
 /**
  * Hybrid AI Service - OpenAI ile başlar, hata durumunda mock'a geçer
  */
@@ -13,17 +31,22 @@ export class HybridAIService {
   constructor(apiKey?: string, model?: string) {
     this.mockAI = new MockAIService();
     
-    if (apiKey && apiKey !== 'your_openai_api_key_here') {
+    // API key'i önce parametre olarak, sonra function'dan al
+    const finalApiKey = apiKey || getApiKey();
+    console.log('🔑 API Key check:', finalApiKey?.substring(0, 10) + '...' || 'No key found');
+    
+    if (finalApiKey && finalApiKey !== 'your_openai_api_key_here' && finalApiKey.startsWith('sk-')) {
       try {
-        this.realAI = new HealthAIService(apiKey, model);
+        this.realAI = new HealthAIService(finalApiKey, model);
         this.useRealAI = true;
-        console.log('🤖 Real AI Service initialized');
+        console.log('🤖 Real AI Service initialized successfully');
       } catch (error) {
-        console.log('⚠️ Real AI Service failed, using Mock AI');
+        console.log('⚠️ Real AI Service failed, using Mock AI:', error);
         this.useRealAI = false;
       }
     } else {
-      console.log('🎭 Using Mock AI Service (no API key)');
+      console.log('🎭 Using Mock AI Service (no valid API key)');
+      console.log('💡 Key format check:', finalApiKey ? 'Key exists but invalid format' : 'No key provided');
       this.useRealAI = false;
     }
   }

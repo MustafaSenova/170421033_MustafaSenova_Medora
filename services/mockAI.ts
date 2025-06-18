@@ -91,6 +91,7 @@ export class MockAIService {
       insights: insights.slice(0, 3),
       recommendations: recommendations.slice(0, 3),
       alerts: alerts.slice(0, 2),
+      riskLevel,
       riskAssessment: {
         level: riskLevel,
         factors: riskFactors

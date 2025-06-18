@@ -5,6 +5,7 @@ import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndP
 import { setDoc, doc, getDoc, updateDoc } from "firebase/firestore";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useState } from "react";
+import { View, Text } from "react-native";
 
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -13,20 +14,15 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<UserType>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [isNavigationReady, setIsNavigationReady] = useState(false);
+    const [isNavigationReady, setIsNavigationReady] = useState(true); // Hemen true yap
     const router = useRouter();
     
-    // Navigation ready olduğunda set et
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsNavigationReady(true);
-        }, 100); // Kısa bir delay ile navigation'ın hazır olmasını bekle
+        console.log('AuthContext useEffect started, navigation ready:', isNavigationReady);
         
-        return () => clearTimeout(timer);
-    }, []);
-    
-    useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+            console.log('Auth state changed:', firebaseUser ? 'logged in' : 'logged out');
+            
             if (firebaseUser) {
                 setUser({
                     uid: firebaseUser?.uid,
@@ -38,7 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 try {
                     // Kullanıcı verilerini al ve role'ü kontrol et - timeout ekle
                     const timeoutPromise = new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Request timeout')), 10000)
+                        setTimeout(() => reject(new Error('Request timeout')), 5000)
                     );
                     
                     const userData = await Promise.race([
@@ -47,45 +43,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     ]) as UserType;
                     
                     if (isNavigationReady) {
-                        if (userData?.role === 'doctor') {
-                            // Doktor ise doğrudan tabs'a yönlendir
-                            console.log("Doktor girişi yapıldı, rol:", userData.role);
-                            router.replace("/(tabs)");
-                        } else if (userData?.role === 'patient') {
-                            // Hasta ise health profile kontrolü yap
-                            const docRef = doc(db, "patients", firebaseUser.uid);
-                            const docSnap = await getDoc(docRef);
-                            
-                            if (docSnap.exists()) {
-                                const patientData = docSnap.data();
-                                if (!patientData.healthProfile) {
-                                    // Health profile yoksa onboarding'e yönlendir
-                                    router.replace("/(auth)/onboarding-modal");
+                        // Navigation için kısa delay ekle
+                        setTimeout(async () => {
+                            if (userData?.role === 'doctor') {
+                                // Doktor ise doğrudan tabs'a yönlendir
+                                console.log("Doktor girişi yapıldı, rol:", userData.role);
+                                router.replace("/(tabs)");
+                            } else if (userData?.role === 'patient') {
+                                // Hasta ise health profile kontrolü yap
+                                const docRef = doc(db, "patients", firebaseUser.uid);
+                                const docSnap = await getDoc(docRef);
+                                
+                                if (docSnap.exists()) {
+                                    const patientData = docSnap.data();
+                                    if (!patientData.healthProfile) {
+                                        // Health profile yoksa onboarding'e yönlendir
+                                        router.replace("/(auth)/onboarding-modal");
+                                    } else {
+                                        router.replace("/(tabs)");
+                                    }
                                 } else {
                                     router.replace("/(tabs)");
                                 }
                             } else {
-                                router.replace("/(tabs)");
+                                // Kullanıcı bulunamadıysa welcome sayfasına yönlendir
+                                console.log("Kullanıcı bulunamadı, welcome sayfasına yönlendiriliyor");
+                                router.replace("/(auth)/welcome");
                             }
-                        } else {
-                            // Kullanıcı bulunamadıysa welcome sayfasına yönlendir
-                            console.log("Kullanıcı bulunamadı, welcome sayfasına yönlendiriliyor");
-                            router.replace("/(auth)/welcome");
-                        }
+                        }, 100);
                     }
                 } catch (error) {
                     console.error("Kullanıcı verisi alınırken hata:", error);
                     if (isNavigationReady) {
-                        router.replace("/(auth)/welcome");
+                        setTimeout(() => {
+                            console.log('Error occurred, navigating to welcome');
+                            router.replace("/(auth)/welcome");
+                        }, 200);
                     }
                 } finally {
+                    console.log('Setting loading to false after user data fetch');
                     setIsLoading(false);
                 }
             } else {
+                console.log('No user, redirecting to welcome');
                 setUser(null);
                 setIsLoading(false);
                 if (isNavigationReady) {
-                    router.replace("/(auth)/welcome");
+                    setTimeout(() => {
+                        console.log('Navigating to welcome page');
+                        router.replace("/(auth)/welcome");
+                    }, 200);
                 }
             }
         });
@@ -376,6 +383,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshUserData,
         logout,
         isLoading
+    }
+
+    // Loading screen göster
+    if (isLoading) {
+        return (
+            <AuthContext.Provider value={contextValue}>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
+                    <Text style={{ fontSize: 18, color: '#333', marginBottom: 20 }}>Giriş kontrol ediliyor...</Text>
+                </View>
+            </AuthContext.Provider>
+        );
     }
 
     return (

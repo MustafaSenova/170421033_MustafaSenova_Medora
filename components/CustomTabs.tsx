@@ -23,7 +23,7 @@ export default function CustomTabs({
             return ['index', 'patients', 'appointment', 'messages', 'profile'].includes(routeName);
         } else {
             // Hasta için gösterilecek tab'lar
-            return ['index', 'appointments', 'health-data', 'health-metrics', 'profile'].includes(routeName);
+            return ['index', 'appointments', 'health-data', 'ai-health', 'profile'].includes(routeName);
         }
     };
 
@@ -69,6 +69,17 @@ export default function CustomTabs({
             >
 
             </Icons.ChartLine>
+
+            
+        ),
+        'ai-health': (isFocused: boolean)=>(
+            <Icons.Robot
+            size={verticalScale(30)}
+            weight={isFocused ? "fill" : "regular"}
+            color={isFocused ? colors.primary : colors.neutral400}
+            >
+
+            </Icons.Robot>
 
             
         ),

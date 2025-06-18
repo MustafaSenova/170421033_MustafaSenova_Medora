@@ -99,3 +99,118 @@ export interface ChatMessage {
   timestamp: string;
   context?: HealthContext;
 }
+
+// Google Fit / Samsung Health data structure
+export interface HealthData {
+  id?: string; // Firestore document ID
+  userId: string;
+  timestamp: number;
+  date: string; // YYYY-MM-DD format
+  heartRate?: number;
+  steps?: number;
+  calories?: number;
+  distance?: number; // in meters
+  weight?: number; // in kg
+  bloodPressure?: {
+    systolic: number;
+    diastolic: number;
+  };
+  sleep?: {
+    duration: number; // in minutes
+    quality?: 'poor' | 'fair' | 'good' | 'excellent';
+  };
+  syncedAt: number; // timestamp when synced
+}
+
+// Expanded health data for AI models
+export interface ComprehensiveHealthData extends HealthData {
+  // Vital signs
+  bodyTemperature?: number;
+  oxygenSaturation?: number; // SpO2
+  respiratoryRate?: number;
+  
+  // Body composition
+  height?: number; // in cm
+  bmi?: number;
+  bodyFat?: number; // percentage
+  muscleMass?: number; // in kg
+  
+  // Blood metrics
+  cholesterol?: {
+    total?: number;
+    hdl?: number;
+    ldl?: number;
+    triglycerides?: number;
+  };
+  glucose?: number; // mg/dL
+  hba1c?: number; // percentage
+  
+  // Lifestyle factors
+  smokingStatus?: 'never' | 'former' | 'current';
+  alcoholConsumption?: 'none' | 'light' | 'moderate' | 'heavy';
+  physicalActivity?: 'sedentary' | 'light' | 'moderate' | 'vigorous';
+  
+  // ECG data
+  ecgData?: {
+    rawSignal?: number[]; // 187 data points for MIT-BIH
+    heartRateVariability?: number;
+    qrsInterval?: number;
+    qtInterval?: number;
+    prInterval?: number;
+  };
+  
+  // Stress and mental health
+  stressLevel?: number; // 1-10 scale
+  sleepQuality?: number; // 1-10 scale
+  moodScore?: number; // 1-10 scale
+  
+  // Environmental factors
+  weather?: {
+    temperature?: number;
+    humidity?: number;
+    airQuality?: number;
+  };
+}
+
+// AI Model Predictions
+export interface CardiovascularRiskPrediction {
+  riskScore: number; // 0-1 probability
+  riskLevel: 'low' | 'moderate' | 'high' | 'very_high';
+  confidence: number; // 0-1
+  factors: {
+    age: number;
+    gender: number;
+    bmi: number;
+    bloodPressure: number;
+    lifestyle: number;
+    metabolic: number;
+  };
+  recommendations: string[];
+  timestamp: number;
+}
+
+export interface ECGAnalysisPrediction {
+  classification: 'Normal' | 'Supraventricular' | 'Ventricular' | 'Fusion' | 'Unknown';
+  confidence: number; // 0-1
+  anomalyScore: number; // 0-1
+  features: {
+    heartRate: number;
+    rhythm: string;
+    morphology: string;
+  };
+  recommendations: string[];
+  timestamp: number;
+}
+
+export interface AIHealthAssessment {
+  id?: string; // Firestore document ID
+  userId: string;
+  timestamp: number;
+  date: string;
+  cardiovascularRisk?: CardiovascularRiskPrediction;
+  ecgAnalysis?: ECGAnalysisPrediction;
+  overallRiskScore: number; // Combined risk 0-1
+  priorityAlerts: string[];
+  actionItems: string[];
+  nextAssessmentDate: string;
+}

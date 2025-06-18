@@ -1,230 +1,455 @@
 import React from 'react';
-import { StyleSheet, View, Dimensions } from 'react-native';
-import { LineChart, BarChart, ProgressChart } from 'react-native-chart-kit';
-import Typo from './Typo';
-import { colors, spacingX, spacingY } from '@/constants/theme';
+import { View, Text, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
+import { colors } from '../constants/theme';
+import { HealthData } from '../types/health';
 
 const screenWidth = Dimensions.get('window').width;
-// Padding ve margin'ları çıkararak güvenli chart genişliği hesapla
-const chartWidth = screenWidth - (spacingX._40 + spacingX._30); // container padding + extra margin
+const chartWidth = screenWidth - 64; // Container padding (32) + chart margin (32)
 
 interface HealthChartProps {
+  data: HealthData[];
+  type: 'steps' | 'calories' | 'heartRate' | 'distance' | 'sleep' | 'weight' | 'bloodPressure' | 'overview';
   title: string;
-  data: number[];
-  labels?: string[];
-  type: 'line' | 'bar' | 'progress';
-  color?: string;
-  unit?: string;
-  target?: number;
-  showValues?: boolean;
 }
 
-const HealthChart: React.FC<HealthChartProps> = ({
-  title,
-  data,
-  labels,
-  type,
-  color = colors.primary,
-  unit = '',
-  target,
-  showValues = false,
-}) => {
-  // Son 7 günün verilerini al
-  const recentData = data.slice(-7);
-  const recentLabels = labels ? labels.slice(-7) : 
-    Array.from({ length: recentData.length }, (_, i) => `${i + 1}`);
+const chartConfig = {
+  backgroundColor: 'rgba(0,0,0,0.3)',
+  backgroundGradientFrom: 'rgba(0,0,0,0.4)',
+  backgroundGradientTo: 'rgba(0,0,0,0.2)',
+  decimalPlaces: 0,
+  color: (opacity = 1) => `rgba(${hexToRgb(colors.primary)}, ${opacity})`,
+  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity * 0.9})`,
+  style: {
+    borderRadius: 12,
+  },
+  propsForDots: {
+    r: '4',
+    strokeWidth: '2',
+    stroke: colors.primary,
+  },
+  paddingRight: 40,
+};
 
-  // Chart config
-  const chartConfig = {
-    backgroundColor: colors.neutral800,
-    backgroundGradientFrom: colors.neutral800,
-    backgroundGradientTo: colors.neutral700,
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(${hexToRgb(color)}, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity * 0.7})`,
-    style: {
-      borderRadius: 12,
-    },
-    propsForDots: {
-      r: '3',
-      strokeWidth: '2',
-      stroke: color,
-    },
-    propsForBackgroundLines: {
-      strokeDasharray: '',
-      stroke: `rgba(255, 255, 255, 0.1)`,
-    },
-    fillShadowGradient: color,
-    fillShadowGradientOpacity: 0.1,
-  };
+// Helper function to convert hex to rgb
+function hexToRgb(hex: string): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return '0,0,0';
+  return `${parseInt(result[1], 16)},${parseInt(result[2], 16)},${parseInt(result[3], 16)}`;
+}
 
-  // Hex to RGB converter
-  function hexToRgb(hex: string): string {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (result) {
-      const r = parseInt(result[1], 16);
-      const g = parseInt(result[2], 16);
-      const b = parseInt(result[3], 16);
-      return `${r}, ${g}, ${b}`;
-    }
-    return '255, 255, 255'; // fallback to white
+export const HealthChart: React.FC<HealthChartProps> = ({ data, type, title }) => {
+  if (!data || data.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Veri bulunamadı</Text>
+      </View>
+    );
   }
 
-  // Line chart data
-  const lineChartData = {
-    labels: recentLabels,
-    datasets: [{
-      data: recentData,
-      color: (opacity = 1) => `rgba(${hexToRgb(color)}, ${opacity})`,
-      strokeWidth: 2,
-    }],
+  const renderStepsChart = () => {
+    const chartData = {
+      labels: data.slice(-7).map(d => new Date(d.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
+      datasets: [{
+        data: data.slice(-7).map(d => d.steps || 0),
+        color: (opacity = 1) => `rgba(${hexToRgb(colors.primary)}, ${Math.min(opacity + 0.2, 1)})`,
+        strokeWidth: 3,
+      }],
+    };
+
+    return (
+      <LineChart
+        data={chartData}
+        width={chartWidth}
+        height={200}
+        chartConfig={chartConfig}
+        bezier
+        style={styles.chart}
+      />
+    );
   };
 
-  // Bar chart data
-  const barChartData = {
-    labels: recentLabels,
-    datasets: [{
-      data: recentData,
-    }],
+  const renderCaloriesChart = () => {
+    const chartData = {
+      labels: data.slice(-7).map(d => new Date(d.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
+      datasets: [{
+        data: data.slice(-7).map(d => d.calories || 0),
+        color: (opacity = 1) => `rgba(${hexToRgb(colors.orange)}, ${opacity})`,
+      }],
+    };
+
+    return (
+      <BarChart
+        data={chartData}
+        width={chartWidth}
+        height={200}
+        yAxisLabel=""
+        yAxisSuffix=""
+        chartConfig={{
+          ...chartConfig,
+          color: (opacity = 1) => `rgba(${hexToRgb(colors.orange)}, ${Math.min(opacity + 0.3, 1)})`,
+        }}
+        style={styles.chart}
+      />
+    );
   };
 
-  // Progress chart data (for targets)
-  const progressData = target ? {
-    labels: ['Hedef'],
-    data: [Math.min(recentData[recentData.length - 1] / target, 1)],
-  } : {
-    labels: ['Değer'],
-    data: [0.5],
+  const renderHeartRateChart = () => {
+    const chartData = {
+      labels: data.slice(-7).map(d => new Date(d.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
+      datasets: [{
+        data: data.slice(-7).map(d => d.heartRate || 0),
+        color: (opacity = 1) => `rgba(${hexToRgb(colors.rose)}, ${Math.min(opacity + 0.2, 1)})`,
+        strokeWidth: 3,
+      }],
+    };
+
+    return (
+      <LineChart
+        data={chartData}
+        width={chartWidth}
+        height={200}
+        chartConfig={{
+          ...chartConfig,
+          color: (opacity = 1) => `rgba(${hexToRgb(colors.rose)}, ${Math.min(opacity + 0.2, 1)})`,
+        }}
+        bezier
+        style={styles.chart}
+      />
+    );
   };
 
-  // Latest value
-  const latestValue = recentData[recentData.length - 1];
-  const average = recentData.reduce((sum, val) => sum + val, 0) / recentData.length;
+  const renderDistanceChart = () => {
+    const chartData = {
+      labels: data.slice(-7).map(d => new Date(d.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
+      datasets: [{
+        data: data.slice(-7).map(d => d.distance || 0),
+        color: (opacity = 1) => `rgba(${hexToRgb(colors.green)}, ${opacity})`,
+      }],
+    };
+
+    return (
+      <BarChart
+        data={chartData}
+        width={chartWidth}
+        height={200}
+        yAxisLabel=""
+        yAxisSuffix=""
+        chartConfig={{
+          ...chartConfig,
+          color: (opacity = 1) => `rgba(${hexToRgb(colors.green)}, ${Math.min(opacity + 0.3, 1)})`,
+        }}
+        style={styles.chart}
+      />
+    );
+  };
+
+  const renderSleepChart = () => {
+    const chartData = {
+      labels: data.slice(-7).map(d => new Date(d.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
+      datasets: [{
+        data: data.slice(-7).map(d => d.sleep?.duration || 0),
+        color: (opacity = 1) => `rgba(${hexToRgb(colors.purple)}, ${Math.min(opacity + 0.2, 1)})`,
+        strokeWidth: 3,
+      }],
+    };
+
+    return (
+      <LineChart
+        data={chartData}
+        width={chartWidth}
+        height={200}
+        chartConfig={{
+          ...chartConfig,
+          color: (opacity = 1) => `rgba(${hexToRgb(colors.purple)}, ${Math.min(opacity + 0.2, 1)})`,
+        }}
+        bezier
+        style={styles.chart}
+      />
+    );
+  };
+
+  const renderWeightChart = () => {
+    const chartData = {
+      labels: data.slice(-7).map(d => new Date(d.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
+      datasets: [{
+        data: data.slice(-7).map(d => d.weight || 0),
+        color: (opacity = 1) => `rgba(${hexToRgb(colors.blue)}, ${Math.min(opacity + 0.2, 1)})`,
+        strokeWidth: 3,
+      }],
+    };
+
+    return (
+      <LineChart
+        data={chartData}
+        width={chartWidth}
+        height={200}
+        chartConfig={{
+          ...chartConfig,
+          color: (opacity = 1) => `rgba(${hexToRgb(colors.blue)}, ${Math.min(opacity + 0.2, 1)})`,
+        }}
+        bezier
+        style={styles.chart}
+      />
+    );
+  };
+
+  const renderBloodPressureChart = () => {
+    const systolicData = data.slice(-7).map(d => d.bloodPressure?.systolic || 0);
+    const diastolicData = data.slice(-7).map(d => d.bloodPressure?.diastolic || 0);
+    
+    const chartData = {
+      labels: data.slice(-7).map(d => new Date(d.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })),
+      datasets: [
+        {
+          data: systolicData,
+          color: (opacity = 1) => `rgba(${hexToRgb(colors.rose)}, ${Math.min(opacity + 0.2, 1)})`,
+          strokeWidth: 3,
+        },
+        {
+          data: diastolicData,
+          color: (opacity = 1) => `rgba(${hexToRgb(colors.blue)}, ${Math.min(opacity + 0.2, 1)})`,
+          strokeWidth: 3,
+        },
+      ],
+    };
+
+    return (
+      <LineChart
+        data={chartData}
+        width={chartWidth}
+        height={200}
+        chartConfig={chartConfig}
+        bezier
+        style={styles.chart}
+      />
+    );
+  };
+
+  const renderOverviewChart = () => {
+    const latest = data[data.length - 1];
+    const totalSteps = latest.steps || 0;
+    const totalCalories = latest.calories || 0;
+    const heartRate = latest.heartRate || 0;
+
+    const pieData = [
+      {
+        name: 'Adım',
+        population: Math.round((totalSteps / 15000) * 100), // Target: 15000 steps
+        color: colors.primary,
+        legendFontColor: 'rgba(255,255,255,0.8)',
+        legendFontSize: 12,
+      },
+      {
+        name: 'Kalori',
+        population: Math.round((totalCalories / 2000) * 100), // Target: 2000 calories
+        color: colors.orange,
+        legendFontColor: 'rgba(255,255,255,0.8)',
+        legendFontSize: 12,
+      },
+      {
+        name: 'Kalp Hızı',
+        population: Math.round((heartRate / 100) * 100), // Relative to 100 bpm
+        color: colors.rose,
+        legendFontColor: 'rgba(255,255,255,0.8)',
+        legendFontSize: 12,
+      },
+    ];
+
+    return (
+      <PieChart
+        data={pieData}
+        width={chartWidth}
+        height={200}
+        chartConfig={chartConfig}
+        accessor="population"
+        backgroundColor="transparent"
+        paddingLeft="15"
+        style={styles.chart}
+      />
+    );
+  };
 
   const renderChart = () => {
     switch (type) {
-      case 'line':
-        return (
-          <View style={styles.chartContainer}>
-            <LineChart
-              data={lineChartData}
-              width={chartWidth}
-              height={160}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chart}
-              withHorizontalLabels={true}
-              withVerticalLabels={true}
-              withInnerLines={false}
-              withOuterLines={false}
-            />
-          </View>
-        );
-      case 'bar':
-        return (
-          <View style={styles.chartContainer}>
-            <BarChart
-              data={barChartData}
-              width={chartWidth}
-              height={160}
-              chartConfig={chartConfig}
-              style={styles.chart}
-              withHorizontalLabels={true}
-              withInnerLines={false}
-              withOuterLines={false}
-              showValuesOnTopOfBars={false}
-            />
-          </View>
-        );
-      case 'progress':
-        return (
-          <View style={styles.progressContainer}>
-            <ProgressChart
-              data={progressData}
-              width={chartWidth}
-              height={100}
-              strokeWidth={12}
-              radius={28}
-              chartConfig={chartConfig}
-              hideLegend={true}
-              style={styles.progressChart}
-            />
-          </View>
-        );
+      case 'steps':
+        return renderStepsChart();
+      case 'calories':
+        return renderCaloriesChart();
+      case 'heartRate':
+        return renderHeartRateChart();
+      case 'distance':
+        return renderDistanceChart();
+      case 'sleep':
+        return renderSleepChart();
+      case 'weight':
+        return renderWeightChart();
+      case 'bloodPressure':
+        return renderBloodPressureChart();
+      case 'overview':
+        return renderOverviewChart();
       default:
-        return null;
+        return renderStepsChart();
     }
   };
+
+  const getStats = () => {
+    const latest = data[data.length - 1];
+    const previous = data[data.length - 2];
+    
+    switch (type) {
+      case 'steps':
+        return {
+          current: latest.steps || 0,
+          change: previous ? (latest.steps || 0) - (previous.steps || 0) : 0,
+          unit: 'adım',
+        };
+      case 'calories':
+        return {
+          current: latest.calories || 0,
+          change: previous ? (latest.calories || 0) - (previous.calories || 0) : 0,
+          unit: 'kcal',
+        };
+      case 'heartRate':
+        return {
+          current: latest.heartRate || 0,
+          change: previous ? (latest.heartRate || 0) - (previous.heartRate || 0) : 0,
+          unit: 'bpm',
+        };
+      case 'distance':
+        return {
+          current: latest.distance || 0,
+          change: previous ? (latest.distance || 0) - (previous.distance || 0) : 0,
+          unit: 'km',
+        };
+      case 'sleep':
+        return {
+          current: latest.sleep?.duration || 0,
+          change: previous ? (latest.sleep?.duration || 0) - (previous.sleep?.duration || 0) : 0,
+          unit: 'saat',
+        };
+      case 'weight':
+        return {
+          current: latest.weight || 0,
+          change: previous ? (latest.weight || 0) - (previous.weight || 0) : 0,
+          unit: 'kg',
+        };
+      default:
+        return { current: 0, change: 0, unit: '' };
+    }
+  };
+
+  const stats = getStats();
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Typo size={16} fontWeight="600">{title}</Typo>
-        {showValues && (
-          <View style={styles.values}>
-            <Typo size={14} color={colors.textLighter}>
-              Son: {latestValue.toFixed(0)}{unit}
-            </Typo>
-            <Typo size={12} color={colors.textLighter}>
-              Ort: {average.toFixed(0)}{unit}
-            </Typo>
+        <Text style={styles.title}>{title}</Text>
+        {type !== 'overview' && type !== 'bloodPressure' && (
+          <View style={styles.statsContainer}>
+            <Text style={styles.currentValue}>
+              {stats.current.toLocaleString('tr-TR')} {stats.unit}
+            </Text>
+            <Text style={[
+              styles.changeValue,
+              { color: stats.change >= 0 ? colors.green : colors.rose }
+            ]}>
+              {stats.change >= 0 ? '+' : ''}{stats.change.toLocaleString('tr-TR')}
+            </Text>
           </View>
         )}
       </View>
       
-      {renderChart()}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {renderChart()}
+      </ScrollView>
       
-      {target && type === 'progress' && (
-        <View style={styles.targetInfo}>
-          <Typo size={12} color={colors.textLighter}>
-            Hedef: {target}{unit} • Mevcut: {latestValue.toFixed(0)}{unit}
-          </Typo>
-          <Typo size={12} color={latestValue >= target ? colors.green : colors.rose}>
-            {latestValue >= target ? 'Hedefe ulaşıldı!' : `${(target - latestValue).toFixed(0)} kaldı`}
-          </Typo>
+      {type === 'bloodPressure' && (
+        <View style={styles.legendContainer}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: colors.rose }]} />
+            <Text style={styles.legendText}>Sistolik</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: colors.blue }]} />
+            <Text style={styles.legendText}>Diyastolik</Text>
+          </View>
         </View>
       )}
     </View>
   );
 };
 
-export default HealthChart;
-
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.neutral800,
-    borderRadius: 12,
-    padding: spacingY._15,
-    marginBottom: spacingY._15,
-    overflow: 'hidden', // Chart taşmasını önle
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacingY._10,
+    marginBottom: 12,
   },
-  values: {
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.white,
+    flex: 1,
+  },
+  statsContainer: {
     alignItems: 'flex-end',
   },
-  chartContainer: {
-    alignItems: 'center',
-    overflow: 'hidden',
+  currentValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  changeValue: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   chart: {
-    borderRadius: 8,
-    marginVertical: spacingY._5,
+    marginVertical: 4,
+    borderRadius: 12,
   },
-  progressContainer: {
+  emptyContainer: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    padding: 40,
     alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  legendContainer: {
+    flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: spacingY._10,
+    marginTop: 8,
+    gap: 20,
   },
-  progressChart: {
-    borderRadius: 8,
-  },
-  targetInfo: {
-    marginTop: spacingY._10,
+  legendItem: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
   },
 }); 

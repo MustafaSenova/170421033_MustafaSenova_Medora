@@ -108,38 +108,42 @@ export class HealthAIService {
    * Sağlık verisi analizi için prompt oluştur
    */
   private buildHealthAnalysisPrompt(context: HealthContext): string {
-    const { userProfile, currentMetrics } = context;
+    const { demographics, vitals, userProfile, currentMetrics } = context;
+    
+    // Güvenli şekilde veri al
+    const age = demographics?.age || userProfile?.age || 30;
+    const gender = demographics?.gender || userProfile?.gender || 'bilinmiyor';
     
     let prompt = `Sağlık Profili Analizi:
-Kullanıcı: ${userProfile.age} yaş, ${userProfile.gender}`;
+Kullanıcı: ${age} yaş, ${gender}`;
     
-    if (userProfile.weight && userProfile.height) {
+    if (userProfile?.weight && userProfile?.height) {
       const bmi = userProfile.weight / Math.pow(userProfile.height / 100, 2);
       prompt += `\nBMI: ${bmi.toFixed(1)}`;
     }
 
     // Kalp atışı analizi
-    if (currentMetrics.heartRate && currentMetrics.heartRate.length > 0) {
+    if (currentMetrics?.heartRate && currentMetrics.heartRate.length > 0) {
       const latest = currentMetrics.heartRate[currentMetrics.heartRate.length - 1];
       const avg = currentMetrics.heartRate.reduce((sum, hr) => sum + hr.value, 0) / currentMetrics.heartRate.length;
       prompt += `\nKalp Atışı: Son ölçüm ${latest.value} BPM, Ortalama ${avg.toFixed(0)} BPM`;
     }
 
     // Kan basıncı analizi
-    if (currentMetrics.bloodPressure && currentMetrics.bloodPressure.length > 0) {
+    if (currentMetrics?.bloodPressure && currentMetrics.bloodPressure.length > 0) {
       const latest = currentMetrics.bloodPressure[currentMetrics.bloodPressure.length - 1];
       prompt += `\nKan Basıncı: ${latest.systolic}/${latest.diastolic} mmHg`;
     }
 
     // Uyku analizi
-    if (currentMetrics.sleep && currentMetrics.sleep.length > 0) {
+    if (currentMetrics?.sleep && currentMetrics.sleep.length > 0) {
       const latest = currentMetrics.sleep[currentMetrics.sleep.length - 1];
       const hours = latest.duration / 60;
       prompt += `\nUyku: ${hours.toFixed(1)} saat, Kalite: ${latest.quality || 'bilinmiyor'}`;
     }
 
     // Aktivite analizi
-    if (currentMetrics.activity && currentMetrics.activity.length > 0) {
+    if (currentMetrics?.activity && currentMetrics.activity.length > 0) {
       const latest = currentMetrics.activity[currentMetrics.activity.length - 1];
       prompt += `\nAktivite: ${latest.steps} adım, ${latest.calories} kalori`;
     }
@@ -159,15 +163,19 @@ Tıbbi teşhis koymayın, genel sağlık tavsiyeleri verin.`;
    * Sohbet için sistem promptu
    */
   private buildChatSystemPrompt(context: HealthContext): string {
-    const { userProfile, currentMetrics } = context;
+    const { demographics, vitals, userProfile, currentMetrics } = context;
+    
+    // Güvenli şekilde yaş ve cinsiyet al
+    const age = demographics?.age || userProfile?.age || 30;
+    const gender = demographics?.gender || userProfile?.gender || 'bilinmiyor';
     
     return `Sen kişisel bir sağlık asistanısın. Kullanıcının sağlık verilerine sahipsin:
 
-Profil: ${userProfile.age} yaş, ${userProfile.gender}
+Profil: ${age} yaş, ${gender}
 Son Ölçümler:
-- Kalp atışı: ${currentMetrics.heartRate?.[currentMetrics.heartRate.length - 1]?.value || 'Yok'} BPM
-- Kan basıncı: ${currentMetrics.bloodPressure?.[currentMetrics.bloodPressure.length - 1]?.systolic || 'Yok'}/${currentMetrics.bloodPressure?.[currentMetrics.bloodPressure.length - 1]?.diastolic || 'Yok'} mmHg
-- Uyku: ${currentMetrics.sleep?.[currentMetrics.sleep.length - 1]?.duration ? (currentMetrics.sleep[currentMetrics.sleep.length - 1].duration / 60).toFixed(1) + ' saat' : 'Yok'}
+- Kalp atışı: ${vitals?.heartRate || currentMetrics?.heartRate?.[currentMetrics.heartRate.length - 1]?.value || 'Yok'} BPM
+- Kan basıncı: ${vitals?.bloodPressure?.systolic || currentMetrics?.bloodPressure?.[currentMetrics.bloodPressure.length - 1]?.systolic || 'Yok'}/${vitals?.bloodPressure?.diastolic || currentMetrics?.bloodPressure?.[currentMetrics.bloodPressure.length - 1]?.diastolic || 'Yok'} mmHg
+- Sıcaklık: ${vitals?.temperature || 'Yok'} °C
 
 Kurallar:
 - Samimi ve destekleyici ol
@@ -187,14 +195,14 @@ Kurallar:
     let prompt = `Sağlık verilerindeki potansiyel riskleri analiz et:`;
     
     // Kalp atışı trendleri
-    if (currentMetrics.heartRate && currentMetrics.heartRate.length >= 3) {
+    if (currentMetrics?.heartRate && currentMetrics.heartRate.length >= 3) {
       const recent = currentMetrics.heartRate.slice(-3);
       const values = recent.map(hr => hr.value);
       prompt += `\nSon kalp atışları: ${values.join(', ')} BPM`;
     }
 
     // Uyku kalitesi
-    if (currentMetrics.sleep && currentMetrics.sleep.length >= 3) {
+    if (currentMetrics?.sleep && currentMetrics.sleep.length >= 3) {
       const recent = currentMetrics.sleep.slice(-3);
       const avgSleep = recent.reduce((sum, s) => sum + s.duration, 0) / (recent.length * 60);
       prompt += `\nOrtalama uyku: ${avgSleep.toFixed(1)} saat`;
@@ -235,6 +243,7 @@ Kurallar:
       recommendations: recommendations.slice(0, 3),
       alerts: alerts.slice(0, 2),
       confidence: 0.8, // Static for prototype
+      riskLevel: 'low', // Default risk level
     };
   }
 

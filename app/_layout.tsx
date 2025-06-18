@@ -13,10 +13,11 @@ const StackLayout = () => {
   useEffect(() => {
     const prepare = async () => {
       try {
-        // Burada gerekli initialization işlemleri yapılabilir
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Minimum loading time
+        // Minimum loading time'ı kaldır, hızlı başlat
+        await new Promise(resolve => setTimeout(resolve, 100));
+        console.log('App initialization completed');
       } catch (e) {
-        console.warn(e);
+        console.warn('App initialization error:', e);
       } finally {
         setIsReady(true);
         SplashScreen.hideAsync();
@@ -35,7 +36,18 @@ const StackLayout = () => {
     );
   }
 
-  return <Stack screenOptions={{headerShown:false}}></Stack>
+  return (
+    <Stack screenOptions={{headerShown:false}}>
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="ai-health" options={{ headerShown: false }} />
+      <Stack.Screen name="ai-health-assessment" options={{ headerShown: false }} />
+      <Stack.Screen name="ai-test" options={{ headerShown: false }} />
+      <Stack.Screen name="appointment-detail" options={{ headerShown: false }} />
+      <Stack.Screen name="doctor-detail" options={{ headerShown: false }} />
+    </Stack>
+  )
 }
 
 export default function RootLayout(){
