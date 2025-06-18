@@ -2,6 +2,15 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+<<<<<<< HEAD
+=======
+    "jsx": "react-jsx",
+    "lib": ["ES2015", "ES2017", "ES2018", "ES2019", "ES2020"],
+    "target": "ES2020",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+>>>>>>> son_mea
     "paths": {
       "@/*": [
         "./*"

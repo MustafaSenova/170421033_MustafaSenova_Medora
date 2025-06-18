@@ -112,6 +112,20 @@ const TabsLayout = () => {
       />
       
       <Tabs.Screen
+        name="ai-health"
+        options={{
+          title: 'AI Asistan',
+          tabBarIcon: ({ color, size, focused }: TabBarIconProps) => (
+            <Icons.Robot
+              size={size}
+              color={color}
+              weight={focused ? 'fill' : 'regular'}
+            />
+          ),
+        }}
+      />
+      
+      <Tabs.Screen
         name="health-metrics"
         options={{
           title: 'Sağlık Metrikleri',
