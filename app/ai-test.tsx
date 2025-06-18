@@ -47,13 +47,15 @@ ${result.insights.map(i => `• ${i}`).join('\n')}
       setAnalysis(`Hata: ${error}`);
     }
   };
-
   const testChat = async () => {
     try {
       setChatResponse('AI yanıtlıyor...');
       
       const ai = getAI();
-      const response = await ai.chatWithHealthAssistant('Kalp sağlığı için ne önerirsin?');
+      const healthContext: HealthContext = {
+        demographics: { age: 30, gender: 'male' }
+      };
+      const response = await ai.chatWithHealthAssistant('Kalp sağlığı için ne önerirsin?', healthContext);
       
       setChatResponse(response);
     } catch (error) {

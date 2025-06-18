@@ -1,208 +1,262 @@
-import { HealthContext, AIHealthResponse, ChatMessage, Symptom, Activity } from '../types/health';
+import { HealthContext, AIHealthResponse, ChatMessage } from '../types/health';
 
 /**
- * Mock AI Service - Gerçek AI olmadan test için
+ * Mock AI Service - OpenAI quota dolduğunda veya test için kullanılır
+ * Gerçek AI yanıtlarına benzer akıllı yanıtlar üretir
  */
 export class MockAIService {
   
+  /**
+   * Sağlık verisi analizi (Mock)
+   */
   async analyzeHealthData(context: HealthContext): Promise<AIHealthResponse> {
-    // Simüle edilmiş gecikme
-    await this.delay(1000);
+    const { userProfile, currentMetrics } = context;
     
-    const analysis = this.generateMockAnalysis(context);
-    const recommendations = this.generateMockRecommendations(context);
-    const riskLevel = this.assessMockRiskLevel(context);
-    const insights = this.generateMockInsights(context);
+    const insights: string[] = [];
+    const recommendations: string[] = [];
+    const alerts: string[] = [];
+    
+    // Kalp atışı analizi
+    if (currentMetrics.heartRate && currentMetrics.heartRate.length > 0) {
+      const latest = currentMetrics.heartRate[currentMetrics.heartRate.length - 1];
+      if (latest.value > 100) {
+        insights.push('Kalp atış hızınız normalin üstünde.');
+        recommendations.push('Derin nefes alıp biraz dinlenmeyi deneyin.');
+        alerts.push('Yüksek kalp atışı tespit edildi');
+      } else if (latest.value < 60) {
+        insights.push('Kalp atış hızınız normalin altında.');
+        recommendations.push('Düzenli egzersiz yapıp kardiyoloji kontrolü yaptırın.');
+      } else {
+        insights.push('Kalp atış hızınız normal aralıkta.');
+        recommendations.push('Mevcut aktivite düzeyinizi koruyun.');
+      }
+    }
+
+    // Kan basıncı analizi
+    if (currentMetrics.bloodPressure && currentMetrics.bloodPressure.length > 0) {
+      const latest = currentMetrics.bloodPressure[currentMetrics.bloodPressure.length - 1];
+      if (latest.systolic >= 140 || latest.diastolic >= 90) {
+        insights.push('Kan basıncınız yüksek seviyede.');
+        recommendations.push('Tuz tüketimini azaltın ve doktora başvurun.');
+        alerts.push('Hipertansiyon riski');
+      } else if (latest.systolic >= 130 || latest.diastolic >= 80) {
+        insights.push('Kan basıncınız hafif yüksek.');
+        recommendations.push('Düzenli egzersiz ve sağlıklı beslenme önerilir.');
+      } else {
+        insights.push('Kan basıncınız ideal seviyede.');
+      }
+    }
+
+    // Uyku analizi
+    if (currentMetrics.sleep && currentMetrics.sleep.length > 0) {
+      const latest = currentMetrics.sleep[currentMetrics.sleep.length - 1];
+      const hours = latest.duration / 60;
+      if (hours < 6) {
+        insights.push('Uyku süreniz yetersiz.');
+        recommendations.push('Günde en az 7-8 saat uyumaya çalışın.');
+        alerts.push('Yetersiz uyku süresi');
+      } else if (hours >= 7 && hours <= 9) {
+        insights.push('Uyku süreniz ideal aralıkta.');
+        recommendations.push('Mevcut uyku rutininizi koruyun.');
+      }
+    }
+
+    // Aktivite analizi
+    if (currentMetrics.activity && currentMetrics.activity.length > 0) {
+      const latest = currentMetrics.activity[currentMetrics.activity.length - 1];
+      if (latest.steps < 5000) {
+        recommendations.push('Günlük adım sayınızı artırmaya çalışın.');
+      } else if (latest.steps >= 10000) {
+        insights.push('Harika! Günlük adım hedefinizi aşıyorsunuz.');
+      }
+    }
+
+    // Risk değerlendirmesi
+    let riskLevel: 'low' | 'moderate' | 'high' = 'low';
+    const riskFactors: string[] = [];
+
+    if (alerts.length > 2) {
+      riskLevel = 'high';
+      riskFactors.push('Birden fazla sağlık parametresi dikkat gerektiriyor');
+    } else if (alerts.length > 0) {
+      riskLevel = 'moderate';
+      riskFactors.push('Bazı parametreler takip gerektiriyor');
+    }
+
+    if (userProfile.age > 50) {
+      riskFactors.push('Yaş faktörü');
+    }
 
     return {
-      analysis,
-      recommendations,
-      riskLevel,
-      insights,
-      confidence: 0.85,
-      lastUpdated: new Date().toISOString(),
-      actionItems: this.generateActionItems(context),
-      followUpRecommended: riskLevel !== 'low'
+      insights: insights.slice(0, 3),
+      recommendations: recommendations.slice(0, 3),
+      alerts: alerts.slice(0, 2),
+      riskAssessment: {
+        level: riskLevel,
+        factors: riskFactors
+      },
+      confidence: 0.85
     };
   }
 
+  /**
+   * Sohbet sistemi (Mock)
+   */
   async chatWithHealthAssistant(
     message: string, 
-    chatHistory: ChatMessage[] = [],
-    userContext?: HealthContext
+    context: HealthContext,
+    chatHistory: ChatMessage[] = []
   ): Promise<string> {
-    await this.delay(500);
-    
     const lowerMessage = message.toLowerCase();
-    
-    // Basit keyword matching
-    if (lowerMessage.indexOf('kalp') >= 0 || lowerMessage.indexOf('heart') >= 0) {
-      return "💓 Kalp sağlığı için düzenli egzersiz ve sağlıklı beslenme çok önemli. Stres yönetimi de kalp sağlığınızı destekler. Düzenli kontroller yaptırmanızı öneririm.";
+    const { currentMetrics } = context;
+
+    // Kalp atışı soruları
+    if (lowerMessage.includes('kalp') || lowerMessage.includes('nabız')) {
+      const heartRate = currentMetrics.heartRate?.[currentMetrics.heartRate.length - 1]?.value;
+      if (heartRate) {
+        if (heartRate > 100) {
+          return `Kalp atış hızınız ${heartRate} BPM ile normalin üstünde. Biraz dinlenip derin nefes almayı deneyin. Eğer devam ederse doktora başvurun.`;
+        } else if (heartRate < 60) {
+          return `Kalp atış hızınız ${heartRate} BPM ile normalin altında. Bu sporcular için normal olabilir, ancak kontrole gidin.`;
+        } else {
+          return `Kalp atış hızınız ${heartRate} BPM ile normal aralıkta. Endişe etmenize gerek yok!`;
+        }
+      }
+      return 'Kalp atış hızı veriniz bulunmuyor. Ölçüm yapmanızı öneririm.';
     }
-    
-    if (lowerMessage.indexOf('uyku') >= 0 || lowerMessage.indexOf('sleep') >= 0) {
-      return "😴 Kaliteli uyku sağlığın temeli! Günde 7-9 saat uyku hedefleyin. Uyku öncesi ekran kullanımını azaltın ve rahatlatıcı bir rutininiz olsun.";
+
+    // Kan basıncı soruları
+    if (lowerMessage.includes('kan basıncı') || lowerMessage.includes('tansiyon')) {
+      const bp = currentMetrics.bloodPressure?.[currentMetrics.bloodPressure.length - 1];
+      if (bp) {
+        if (bp.systolic >= 140 || bp.diastolic >= 90) {
+          return `Kan basıncınız ${bp.systolic}/${bp.diastolic} ile yüksek. Doktora başvurmanızı ve tuz tüketimini azaltmanızı öneririm.`;
+        } else {
+          return `Kan basıncınız ${bp.systolic}/${bp.diastolic} ile normal seviyede. Harika!`;
+        }
+      }
+      return 'Kan basıncı veriniz bulunmuyor. Ölçüm yaptırmanızı öneririm.';
     }
-    
-    if (lowerMessage.indexOf('beslenme') >= 0 || lowerMessage.indexOf('diyet') >= 0) {
-      return "🥗 Dengeli beslenme için çeşitli renklerde sebze ve meyve tüketin. Bol su için, işlenmiş gıdaları sınırlayın. Küçük sık öğünler tercih edin.";
-    }
-    
-    if (lowerMessage.indexOf('egzersiz') >= 0 || lowerMessage.indexOf('spor') >= 0) {
-      return "🏃‍♂️ Haftada en az 150 dakika orta yoğunlukta egzersiz yapın. Yürüyüş, yüzme, bisiklet gibi sevdiğiniz aktiviteleri seçin. Küçük adımlarla başlayın!";
-    }
-    
-    if (lowerMessage.indexOf('stres') >= 0) {
-      return "🧘‍♀️ Stres yönetimi için nefes egzersizleri, meditasyon ve hobiler etkili. Düzenli egzersiz ve yeterli uyku da stresi azaltır. Sosyal destek almayı unutmayın.";
-    }
-    
-    if (lowerMessage.indexOf('kilo') >= 0 || lowerMessage.indexOf('weight') >= 0) {
-      return "⚖️ Sağlıklı kilo yönetimi için dengeli beslenme ve düzenli egzersiz önemli. Hızlı kilo verme diyetlerinden kaçının. Uzun vadeli yaşam tarzı değişiklikleri yapın.";
+
+    // Uyku soruları
+    if (lowerMessage.includes('uyku') || lowerMessage.includes('yorgun')) {
+      const sleep = currentMetrics.sleep?.[currentMetrics.sleep.length - 1];
+      if (sleep) {
+        const hours = sleep.duration / 60;
+        if (hours < 6) {
+          return `${hours.toFixed(1)} saat uyku yetersiz. Günde 7-8 saat uyumaya çalışın. Bu yorgunluğun sebebi olabilir.`;
+        } else {
+          return `${hours.toFixed(1)} saat uyku iyi. Yorgunluk başka sebeplerden olabilir. Su içmeyi unutmayın!`;
+        }
+      }
+      return 'Uyku veriniz bulunmuyor. Uyku kalitenizi takip etmenizi öneririm.';
     }
 
     // Genel sağlık soruları
-    const generalResponses = [
-      "🩺 Sağlığınızla ilgili endişeleriniz varsa mutlaka bir doktorla görüşün. Size nasıl yardımcı olabilirim?",
-      "💊 Düzenli kontroller ve sağlıklı yaşam tarzı sağlığın temelini oluşturur. Hangi konuda bilgi almak istiyorsunuz?",
-      "🏥 Sağlık konusunda size yardımcı olmaya hazırım. Lütfen daha spesifik bir soru sorun ki size daha iyi yardım edebileyim.",
-      "🤔 Bu konuda size nasıl yardımcı olabilirim? Kalp sağlığı, beslenme, egzersiz veya uyku hakkında sorularınız var mı?"
-    ];
-    
-    return generalResponses[Math.floor(Math.random() * generalResponses.length)];
-  }
-
-  private generateMockAnalysis(context: HealthContext): string {
-    let analysis = "🔍 **Sağlık Analizi Raporu**\n\n";
-    
-    if (context.vitals) {
-      analysis += "📊 **Vital Bulgular:**\n";
-      const { vitals } = context;
+    if (lowerMessage.includes('nasılım') || lowerMessage.includes('durum')) {
+      const analysis = await this.analyzeHealthData(context);
+      const positive = analysis.insights.filter(i => i.includes('normal') || i.includes('ideal')).length;
       
-      if (vitals.heartRate) {
-        if (vitals.heartRate >= 60 && vitals.heartRate <= 100) {
-          analysis += "✅ Kalp atış hızınız normal aralıkta\n";
-        } else {
-          analysis += "⚠️ Kalp atış hızınız normal aralığın dışında\n";
-        }
-      }
-      
-      if (vitals.bloodPressure) {
-        const { systolic, diastolic } = vitals.bloodPressure;
-        if (systolic < 140 && diastolic < 90) {
-          analysis += "✅ Kan basıncınız normal seviyede\n";
-        } else {
-          analysis += "⚠️ Kan basıncınız yüksek görünüyor\n";
-        }
-      }
-      
-      analysis += "\n";
-    }
-    
-    if (context.symptoms && context.symptoms.length > 0) {
-      analysis += "🩺 **Semptom Değerlendirmesi:**\n";
-      const avgSeverity = context.symptoms.reduce((sum: number, s: Symptom) => sum + s.severity, 0) / context.symptoms.length;
-      
-      if (avgSeverity < 4) {
-        analysis += "✅ Semptomlarınız hafif seviyede\n";
-      } else if (avgSeverity < 7) {
-        analysis += "⚠️ Semptomlarınız orta seviyede\n";
+      if (positive >= 2) {
+        return 'Genel sağlık durumunuz iyi görünüyor! Mevcut rutininizi koruyun.';
+      } else if (analysis.alerts.length > 0) {
+        return 'Bazı parametreleriniz dikkat gerektiriyor. Detaylı analizi kontrol edin ve gerekirse doktora başvurun.';
       } else {
-        analysis += "🚨 Semptomlarınız yoğun seviyede\n";
-      }
-      analysis += "\n";
-    }
-    
-    analysis += "💡 **Genel Değerlendirme:**\n";
-    analysis += "Sağlık verileriniz değerlendirildi. Aşağıdaki önerileri takip ederek sağlığınızı destekleyebilirsiniz.";
-    
-    return analysis;
-  }
-
-  private generateMockRecommendations(context: HealthContext): string[] {
-    const recommendations: string[] = [];
-    
-    // Vital değerlere göre öneriler
-    if (context.vitals?.heartRate && (context.vitals.heartRate < 60 || context.vitals.heartRate > 100)) {
-      recommendations.push("Kalp atış hızınız için kardiyolog kontrolü yaptırın");
-      recommendations.push("Düzenli kardiyovasküler egzersiz yapın");
-    }
-    
-    if (context.vitals?.bloodPressure) {
-      const { systolic } = context.vitals.bloodPressure;
-      if (systolic > 140) {
-        recommendations.push("Tuz tüketiminizi azaltın");
-        recommendations.push("Kan basıncınızı düzenli takip edin");
+        return 'Sağlık verileriniz normal aralıkta. Düzenli takip yapmaya devam edin.';
       }
     }
-    
-    // Genel öneriler
-    recommendations.push("Günde en az 8 bardak su için");
-    recommendations.push("Haftada 3-4 gün egzersiz yapın");
-    recommendations.push("Günde 7-9 saat kaliteli uyku alın");
-    recommendations.push("Stres yönetimi teknikleri uygulayın");
-    recommendations.push("Düzenli sağlık kontrolleri yaptırın");
-    
-    return recommendations.slice(0, 5);
+
+    // Motivasyon ve destek
+    if (lowerMessage.includes('motivasyon') || lowerMessage.includes('öneri')) {
+      const tips = [
+        'Günlük 10.000 adım atmaya çalışın!',
+        'Düzenli su içmeyi unutmayın - günde 2-3 litre ideal.',
+        'Stres yönetimi için derin nefes egzersizleri yapın.',
+        'Kaliteli uyku için akşam rutini oluşturun.',
+        'Düzenli egzersiz hem fiziksel hem mental sağlığa iyi gelir.'
+      ];
+      return tips[Math.floor(Math.random() * tips.length)];
+    }
+
+    // Varsayılan yanıt
+    return 'Size nasıl yardımcı olabilirim? Kalp atışı, kan basıncı, uyku veya genel sağlık durumunuz hakkında sorular sorabilirsiniz.';
   }
 
-  private assessMockRiskLevel(context: HealthContext): 'low' | 'medium' | 'high' {
-    let riskScore = 0;
-    
-    if (context.vitals?.heartRate && (context.vitals.heartRate < 60 || context.vitals.heartRate > 100)) {
-      riskScore += 1;
-    }
-    
-    if (context.vitals?.bloodPressure) {
-      const { systolic, diastolic } = context.vitals.bloodPressure;
-      if (systolic > 140 || diastolic > 90) riskScore += 2;
-    }
-    
-    if (context.symptoms && context.symptoms.length > 0) {
-      const avgSeverity = context.symptoms.reduce((sum: number, s: Symptom) => sum + s.severity, 0) / context.symptoms.length;
-      if (avgSeverity > 7) riskScore += 2;
-      else if (avgSeverity > 5) riskScore += 1;
-    }
-    
-    if (riskScore >= 3) return 'high';
-    if (riskScore >= 1) return 'medium';
-    return 'low';
-  }
+  /**
+   * Proaktif uyarılar (Mock)
+   */
+  async generateProactiveAlerts(context: HealthContext): Promise<string[]> {
+    const { currentMetrics } = context;
+    const alerts: string[] = [];
 
-  private generateMockInsights(context: HealthContext): string[] {
-    const insights: string[] = [];
-    
-    if (context.vitals?.heartRate) {
-      if (context.vitals.heartRate >= 60 && context.vitals.heartRate <= 100) {
-        insights.push("Kalp atış hızınız sağlıklı aralıkta");
+    // Kalp atışı uyarıları
+    if (currentMetrics.heartRate && currentMetrics.heartRate.length >= 3) {
+      const recent = currentMetrics.heartRate.slice(-3);
+      const avgHR = recent.reduce((sum, hr) => sum + hr.value, 0) / recent.length;
+      
+      if (avgHR > 90) {
+        alerts.push('Son kalp atışlarınız yüksek - dinlenmeye odaklanın');
       }
     }
-    
-    if (context.activities && context.activities.length > 0) {
-      const totalCalories = context.activities.reduce((sum: number, a: Activity) => sum + (a.calories || 0), 0);
-      if (totalCalories > 300) {
-        insights.push("Aktif bir yaşam tarzınız var, bu harika!");
+
+    // Uyku uyarıları
+    if (currentMetrics.sleep && currentMetrics.sleep.length >= 2) {
+      const recent = currentMetrics.sleep.slice(-2);
+      const avgSleep = recent.reduce((sum, s) => sum + s.duration, 0) / (recent.length * 60);
+      
+      if (avgSleep < 6.5) {
+        alerts.push('Uyku süreniz yetersiz - erken yatmaya çalışın');
       }
     }
-    
-    insights.push("Düzenli takip sağlığınızı destekler");
-    
-    return insights.slice(0, 3);
+
+    // Aktivite uyarıları
+    if (currentMetrics.activity && currentMetrics.activity.length > 0) {
+      const latest = currentMetrics.activity[currentMetrics.activity.length - 1];
+      
+      if (latest.steps < 3000) {
+        alerts.push('Bugün az hareket ettiniz - kısa yürüyüş yapın');
+      }
+    }
+
+    return alerts;
   }
 
-  private generateActionItems(context: HealthContext): string[] {
-    const actions: string[] = [];
+  /**
+   * Kapsamlı sağlık raporu (Bonus)
+   */
+  async generateHealthReport(context: HealthContext): Promise<string> {
+    const analysis = await this.analyzeHealthData(context);
+    const { userProfile } = context;
     
-    if (context.vitals?.heartRate && context.vitals.heartRate > 100) {
-      actions.push("Doktor randevusu alın");
+    let report = `🏥 ${userProfile.age} Yaş Sağlık Raporu\n\n`;
+    
+    report += `📊 GENEL DURUM\n`;
+    analysis.insights.forEach(insight => {
+      report += `• ${insight}\n`;
+    });
+    
+    report += `\n💡 ÖNERİLER\n`;
+    analysis.recommendations.forEach(rec => {
+      report += `• ${rec}\n`;
+    });
+    
+    if (analysis.alerts.length > 0) {
+      report += `\n⚠️ DİKKAT NOKTALAR\n`;
+      analysis.alerts.forEach(alert => {
+        report += `• ${alert}\n`;
+      });
     }
     
-    actions.push("Su tüketimini artırın");
-    actions.push("Egzersiz rutini oluşturun");
+    report += `\n📈 RİSK DEĞERLENDİRMESİ\n`;
+    report += `Risk Seviyesi: ${analysis.riskAssessment?.level.toUpperCase()}\n`;
+    if (analysis.riskAssessment?.factors.length) {
+      analysis.riskAssessment.factors.forEach(factor => {
+        report += `• ${factor}\n`;
+      });
+    }
     
-    return actions;
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    report += `\n✅ Bu rapor AI tarafından oluşturulmuştur. Tıbbi karar için doktorunuza başvurun.`;
+    
+    return report;
   }
 }

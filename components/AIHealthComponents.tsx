@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
 import { getAI } from '@/services/hybridAI';
 import { HealthContext, AIHealthResponse, ChatMessage } from '@/types/health';
+import { colors, spacingX, spacingY, radius } from '@/constants/theme';
+import { verticalScale } from '@/utils/styling';
 
 // 1. 📊 Sağlık Analizi Komponenti
 export const HealthAnalysisCard = ({ healthData }: { healthData: HealthContext }) => {
@@ -24,10 +26,10 @@ export const HealthAnalysisCard = ({ healthData }: { healthData: HealthContext }
 
   const getRiskColor = (level: string) => {
     switch (level) {
-      case 'high': return '#ff4444';
-      case 'medium': return '#ffaa00';
-      case 'low': return '#00cc44';
-      default: return '#666';
+      case 'high': return colors.rose;       // Tema uyumlu kırmızı
+      case 'medium': return '#f59e0b';       // Tema uyumlu turuncu
+      case 'low': return colors.green;       // Tema uyumlu yeşil
+      default: return colors.neutral500;     // Tema uyumlu gri
     }
   };
 
@@ -65,7 +67,7 @@ export const HealthAnalysisCard = ({ healthData }: { healthData: HealthContext }
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>📋 Öneriler:</Text>
-            {analysis.recommendations?.map((rec, index) => (
+            {analysis.recommendations?.map((rec: string, index: number) => (
               <Text key={index} style={styles.recommendation}>
                 • {rec}
               </Text>
@@ -75,7 +77,7 @@ export const HealthAnalysisCard = ({ healthData }: { healthData: HealthContext }
           {analysis.insights && analysis.insights.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>💡 Önemli Notlar:</Text>
-              {analysis.insights.map((insight, index) => (
+              {analysis.insights.map((insight: string, index: number) => (
                 <Text key={index} style={styles.insight}>
                   • {insight}
                 </Text>
@@ -86,7 +88,7 @@ export const HealthAnalysisCard = ({ healthData }: { healthData: HealthContext }
           {analysis.actionItems && analysis.actionItems.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>✅ Yapılacaklar:</Text>
-              {analysis.actionItems.map((item, index) => (
+              {analysis.actionItems.map((item: string, index: number) => (
                 <Text key={index} style={styles.actionItem}>
                   • {item}
                 </Text>
@@ -104,10 +106,10 @@ export const HealthChatAssistant = ({ userContext }: { userContext?: HealthConte
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
-
   useEffect(() => {
     // Hoş geldin mesajı
     const welcomeMessage: ChatMessage = {
+      id: '1',
       role: 'assistant',
       content: '👋 Merhaba! Ben Medora sağlık asistanınızım. Sağlık konularında size yardımcı olmak için buradayım. Nasıl yardımcı olabilirim?',
       timestamp: new Date().toISOString()
@@ -119,6 +121,7 @@ export const HealthChatAssistant = ({ userContext }: { userContext?: HealthConte
     if (!inputText.trim()) return;
 
     const userMessage: ChatMessage = {
+      id: Date.now().toString(),
       role: 'user',
       content: inputText,
       timestamp: new Date().toISOString()
@@ -130,13 +133,10 @@ export const HealthChatAssistant = ({ userContext }: { userContext?: HealthConte
 
     try {
       const ai = getAI();
-      const response = await ai.chatWithHealthAssistant(
-        inputText,
-        messages,
-        userContext
-      );
+      const response = await ai.chatWithHealthAssistant(inputText, userContext || {}, []);
 
       const assistantMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: response,
         timestamp: new Date().toISOString()
@@ -146,6 +146,7 @@ export const HealthChatAssistant = ({ userContext }: { userContext?: HealthConte
     } catch (error) {
       console.error('Chat Error:', error);
       const errorMessage: ChatMessage = {
+        id: (Date.now() + 2).toString(),
         role: 'assistant',
         content: 'Üzgünüm, şu anda yanıt veremiyorum. Lütfen tekrar deneyin.',
         timestamp: new Date().toISOString()
@@ -212,13 +213,13 @@ export const HealthChatAssistant = ({ userContext }: { userContext?: HealthConte
 
 // 3. 🎯 Hızlı Sağlık İpuçları
 export const QuickHealthTips = () => {
-  const [tips, setTips] = useState<string[]>([]);
-
-  useEffect(() => {
-    const ai = getAI();
-    const quickTips = ai.getQuickHealthTips();
-    setTips(quickTips);
-  }, []);
+  const [tips, setTips] = useState<string[]>([
+    '💧 Günde en az 8 bardak su için',
+    '🚶‍♀️ Günlük 30 dakika yürüyüş yapın',
+    '🥗 Renkli sebze ve meyveleri tercih edin',
+    '😴 Kaliteli uyku için düzenli uyku saatlerine dikkat edin',
+    '🧘‍♂️ Stres yönetimi için nefes egzersizleri yapın'
+  ]);
 
   return (
     <View style={styles.card}>
@@ -234,13 +235,13 @@ export const QuickHealthTips = () => {
 
 // 4. 🚨 Acil Durum Rehberi
 export const EmergencyGuide = () => {
-  const [emergencyTips, setEmergencyTips] = useState<string[]>([]);
-
-  useEffect(() => {
-    const ai = getAI();
-    const tips = ai.getEmergencyGuidance();
-    setEmergencyTips(tips);
-  }, []);
+  const [emergencyTips, setEmergencyTips] = useState<string[]>([
+    '🚨 Nefes almakta güçlük çekiyorsanız hemen 112 arayın',
+    '💔 Göğüs ağrısı durumunda derhal hastaneye gidin',
+    '🤕 Ciddi yaralanmalarda basınç uygulayın ve yardım çağırın',
+    '🔥 Yüksek ateş (39°C+) devam ediyorsa doktora danışın',
+    '😵 Bayılma durumunda kişiyi yan yatırın ve 112 arayın'
+  ]);
 
   const callEmergency = () => {
     Alert.alert(
@@ -272,11 +273,11 @@ export const EmergencyGuide = () => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
+    backgroundColor: colors.white,
+    borderRadius: radius._12,
+    padding: spacingX._15,
+    marginVertical: spacingY._10,
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -285,21 +286,21 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#333',
+    marginBottom: spacingY._15,
+    color: colors.neutral800,
   },
   button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: colors.primary,
+    borderRadius: radius._10,
+    padding: spacingX._12,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacingY._15,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.neutral300,
   },
   buttonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -307,70 +308,70 @@ const styles = StyleSheet.create({
     maxHeight: 400,
   },
   riskSection: {
-    marginBottom: 16,
+    marginBottom: spacingY._15,
   },
   riskBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: spacingX._12,
+    paddingVertical: spacingY._7,
+    borderRadius: radius._15,
     alignSelf: 'flex-start',
-    marginTop: 4,
+    marginTop: spacingY._5,
   },
   riskText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 12,
     fontWeight: 'bold',
   },
   section: {
-    marginBottom: 16,
+    marginBottom: spacingY._15,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
+    marginBottom: spacingY._10,
+    color: colors.neutral800,
   },
   recommendation: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    color: colors.neutral600,
+    marginBottom: spacingY._5,
     lineHeight: 20,
   },
   insight: {
     fontSize: 14,
-    color: '#007AFF',
-    marginBottom: 4,
+    color: colors.primaryLight,
+    marginBottom: spacingY._5,
     lineHeight: 20,
   },
   actionItem: {
     fontSize: 14,
-    color: '#00AA44',
-    marginBottom: 4,
+    color: colors.green,
+    marginBottom: spacingY._5,
     lineHeight: 20,
   },
   chatContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderRadius: radius._12,
     flex: 1,
-    margin: 8,
+    margin: spacingX._10,
   },
   messagesContainer: {
     flex: 1,
-    padding: 16,
+    padding: spacingX._15,
     maxHeight: 400,
   },
   messageContainer: {
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 8,
+    marginBottom: spacingY._12,
+    padding: spacingX._12,
+    borderRadius: radius._10,
     maxWidth: '80%',
   },
   userMessage: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     alignSelf: 'flex-end',
   },
   assistantMessage: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.neutral100,
     alignSelf: 'flex-start',
   },
   messageText: {
@@ -378,88 +379,88 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   userMessageText: {
-    color: '#fff',
+    color: colors.white,
   },
   assistantMessageText: {
-    color: '#333',
+    color: colors.neutral800,
   },
   timestamp: {
     fontSize: 10,
-    color: '#999',
-    marginTop: 4,
+    color: colors.neutral500,
+    marginTop: spacingY._5,
   },
   loadingMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#f0f0f0',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
+    backgroundColor: colors.neutral100,
+    padding: spacingX._12,
+    borderRadius: radius._10,
+    marginBottom: spacingY._12,
   },
   loadingText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.neutral600,
     fontStyle: 'italic',
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 16,
+    padding: spacingX._15,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: colors.neutral200,
     alignItems: 'flex-end',
   },
   textInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
+    borderColor: colors.neutral300,
+    borderRadius: radius._20,
+    paddingHorizontal: spacingX._15,
+    paddingVertical: spacingY._10,
+    marginRight: spacingX._10,
     maxHeight: 100,
     fontSize: 14,
   },
   sendButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 20,
+    backgroundColor: colors.primary,
+    borderRadius: radius._20,
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.neutral300,
   },
   sendButtonText: {
     fontSize: 18,
   },
   tipContainer: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    backgroundColor: colors.neutral50,
+    padding: spacingX._12,
+    borderRadius: radius._10,
+    marginBottom: spacingY._10,
   },
   tip: {
     fontSize: 14,
-    color: '#333',
+    color: colors.neutral800,
     lineHeight: 20,
   },
   emergencyButton: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 8,
-    padding: 16,
+    backgroundColor: colors.rose,
+    borderRadius: radius._10,
+    padding: spacingX._15,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacingY._15,
   },
   emergencyButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 18,
     fontWeight: 'bold',
   },
   emergencyTip: {
     backgroundColor: '#fff3cd',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    padding: spacingX._12,
+    borderRadius: radius._10,
+    marginBottom: spacingY._10,
     borderLeftWidth: 4,
     borderLeftColor: '#ffc107',
   },

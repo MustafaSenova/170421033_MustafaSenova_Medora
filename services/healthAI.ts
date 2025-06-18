@@ -48,180 +48,218 @@ export class HealthAIService {
    */
   async chatWithHealthAssistant(
     message: string, 
-    chatHistory: ChatMessage[] = [],
-    userContext?: HealthContext
+    context: HealthContext,
+    chatHistory: ChatMessage[] = []
   ): Promise<string> {
     try {
-      const systemPrompt = this.buildChatSystemPrompt(userContext);
+      const systemPrompt = this.buildChatSystemPrompt(context);
       const messages = [
-        { role: 'system', content: systemPrompt },
-        ...chatHistory.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })),
-        { role: 'user', content: message }
+        { role: 'system' as const, content: systemPrompt },
+        ...this.formatChatHistory(chatHistory),
+        { role: 'user' as const, content: message }
       ];
 
       const completion = await this.openai.chat.completions.create({
         model: this.model,
-        messages: messages as any,
-        temperature: 0.7,
+        messages: messages,
+        temperature: 0.4,
         max_tokens: 300,
       });
 
-      return completion.choices[0]?.message?.content || 'Üzgünüm, şu anda cevap veremiyorum.';
+      return completion.choices[0]?.message?.content || 'Üzgünüm, şu anda yanıtlayamıyorum.';
     } catch (error) {
       console.error('Chat Error:', error);
       throw new Error('Sohbet yanıtı alınamadı');
     }
   }
 
+  /**
+   * Proaktif sağlık uyarıları
+   */
+  async generateProactiveAlerts(context: HealthContext): Promise<string[]> {
+    try {
+      const prompt = this.buildAlertPrompt(context);
+      
+      const completion = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'Sen proaktif bir sağlık asistanısın. Sağlık verilerindeki riskleri tespit edip, önleyici uyarılar veriyorsun.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 200,
+      });
+
+      const response = completion.choices[0]?.message?.content || '';
+      return this.parseAlerts(response);
+    } catch (error) {
+      console.error('Alert Generation Error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Sağlık verisi analizi için prompt oluştur
+   */
   private buildHealthAnalysisPrompt(context: HealthContext): string {
-    const { vitals, symptoms, demographics, activities } = context;
+    const { userProfile, currentMetrics } = context;
     
-    let prompt = `Sağlık verilerini analiz et ve Türkçe öneriler ver:\n\n`;
+    let prompt = `Sağlık Profili Analizi:
+Kullanıcı: ${userProfile.age} yaş, ${userProfile.gender}`;
     
-    if (vitals) {
-      prompt += `📊 Vital Değerler:\n`;
-      if (vitals.heartRate) prompt += `- Kalp Atışı: ${vitals.heartRate} bpm\n`;
-      if (vitals.bloodPressure) prompt += `- Kan Basıncı: ${vitals.bloodPressure.systolic}/${vitals.bloodPressure.diastolic} mmHg\n`;
-      if (vitals.temperature) prompt += `- Vücut Sıcaklığı: ${vitals.temperature}°C\n`;
-      if (vitals.oxygenSaturation) prompt += `- Oksijen Saturasyonu: ${vitals.oxygenSaturation}%\n`;
-      if (vitals.weight) prompt += `- Kilo: ${vitals.weight} kg\n`;
-      if (vitals.height) prompt += `- Boy: ${vitals.height} cm\n`;
-      prompt += `\n`;
+    if (userProfile.weight && userProfile.height) {
+      const bmi = userProfile.weight / Math.pow(userProfile.height / 100, 2);
+      prompt += `\nBMI: ${bmi.toFixed(1)}`;
     }
 
-    if (symptoms && symptoms.length > 0) {
-      prompt += `🩺 Belirtiler:\n`;
-      symptoms.forEach(symptom => {
-        prompt += `- ${symptom.name} (Şiddet: ${symptom.severity}/10)\n`;
-      });
-      prompt += `\n`;
+    // Kalp atışı analizi
+    if (currentMetrics.heartRate && currentMetrics.heartRate.length > 0) {
+      const latest = currentMetrics.heartRate[currentMetrics.heartRate.length - 1];
+      const avg = currentMetrics.heartRate.reduce((sum, hr) => sum + hr.value, 0) / currentMetrics.heartRate.length;
+      prompt += `\nKalp Atışı: Son ölçüm ${latest.value} BPM, Ortalama ${avg.toFixed(0)} BPM`;
     }
 
-    if (activities && activities.length > 0) {
-      prompt += `🏃‍♂️ Aktiviteler:\n`;
-      activities.forEach(activity => {
-        prompt += `- ${activity.type}: ${activity.duration} dakika, ${activity.calories} kalori\n`;
-      });
-      prompt += `\n`;
+    // Kan basıncı analizi
+    if (currentMetrics.bloodPressure && currentMetrics.bloodPressure.length > 0) {
+      const latest = currentMetrics.bloodPressure[currentMetrics.bloodPressure.length - 1];
+      prompt += `\nKan Basıncı: ${latest.systolic}/${latest.diastolic} mmHg`;
     }
 
-    if (demographics) {
-      prompt += `👤 Demografik Bilgiler:\n`;
-      if (demographics.age) prompt += `- Yaş: ${demographics.age}\n`;
-      if (demographics.gender) prompt += `- Cinsiyet: ${demographics.gender}\n`;
-      if (demographics.conditions) prompt += `- Mevcut Durumlar: ${demographics.conditions.join(', ')}\n`;
-      prompt += `\n`;
+    // Uyku analizi
+    if (currentMetrics.sleep && currentMetrics.sleep.length > 0) {
+      const latest = currentMetrics.sleep[currentMetrics.sleep.length - 1];
+      const hours = latest.duration / 60;
+      prompt += `\nUyku: ${hours.toFixed(1)} saat, Kalite: ${latest.quality || 'bilinmiyor'}`;
     }
 
-    prompt += `Lütfen bu verileri analiz et ve şunları sağla:
-1. Genel sağlık durumu değerlendirmesi
-2. Basit, uygulanabilir öneriler
+    // Aktivite analizi
+    if (currentMetrics.activity && currentMetrics.activity.length > 0) {
+      const latest = currentMetrics.activity[currentMetrics.activity.length - 1];
+      prompt += `\nAktivite: ${latest.steps} adım, ${latest.calories} kalori`;
+    }
+
+    prompt += `\n\nLütfen bu verileri analiz edip:
+1. Genel sağlık durumu hakkında 2-3 basit yorum
+2. 2-3 pratik öneri
 3. Dikkat edilmesi gereken noktalar
-4. Önerilen yaşam tarzı değişiklikleri
+4. Pozitif motivasyon mesajı
 
-Not: Tıbbi teşhis koymuyorsun, sadece genel sağlık tavsiyeleri veriyorsun.`;
+Tıbbi teşhis koymayın, genel sağlık tavsiyeleri verin.`;
 
     return prompt;
   }
 
-  private buildChatSystemPrompt(userContext?: HealthContext): string {
-    let systemPrompt = `Sen Medora sağlık asistanısın. Sağlık konularında yardımcı oluyorsun. 
+  /**
+   * Sohbet için sistem promptu
+   */
+  private buildChatSystemPrompt(context: HealthContext): string {
+    const { userProfile, currentMetrics } = context;
+    
+    return `Sen kişisel bir sağlık asistanısın. Kullanıcının sağlık verilerine sahipsin:
 
-Özellikler:
-- Türkçe konuşuyorsun
-- Dostça ve profesyonel yaklaşımın var
-- Tıbbi teşhis koymuyorsun
-- Acil durumlar için doktora başvurmasını öneriyorsun
-- Genel sağlık bilgisi ve öneriler veriyorsun
-- Emoji kullanarak daha samimi oluyorsun
+Profil: ${userProfile.age} yaş, ${userProfile.gender}
+Son Ölçümler:
+- Kalp atışı: ${currentMetrics.heartRate?.[currentMetrics.heartRate.length - 1]?.value || 'Yok'} BPM
+- Kan basıncı: ${currentMetrics.bloodPressure?.[currentMetrics.bloodPressure.length - 1]?.systolic || 'Yok'}/${currentMetrics.bloodPressure?.[currentMetrics.bloodPressure.length - 1]?.diastolic || 'Yok'} mmHg
+- Uyku: ${currentMetrics.sleep?.[currentMetrics.sleep.length - 1]?.duration ? (currentMetrics.sleep[currentMetrics.sleep.length - 1].duration / 60).toFixed(1) + ' saat' : 'Yok'}
 
-`;
-
-    if (userContext) {
-      systemPrompt += `Kullanıcının mevcut sağlık durumu:
-${userContext.demographics?.age ? `- Yaş: ${userContext.demographics.age}` : ''}
-${userContext.demographics?.gender ? `- Cinsiyet: ${userContext.demographics.gender}` : ''}
-${userContext.demographics?.conditions ? `- Mevcut durumlar: ${userContext.demographics.conditions.join(', ')}` : ''}
-
-Bu bilgileri göz önünde bulundurarak kişiselleştirilmiş tavsiyeler ver.`;
-    }
-
-    return systemPrompt;
+Kurallar:
+- Samimi ve destekleyici ol
+- Basit dil kullan
+- Tıbbi teşhis koyma
+- Gerekirse doktora yönlendir
+- Pozitif ve motive edici ol
+- Kısa ve net yanıtlar ver (max 2-3 cümle)`;
   }
 
+  /**
+   * Uyarı promptu oluştur
+   */
+  private buildAlertPrompt(context: HealthContext): string {
+    const { currentMetrics } = context;
+    
+    let prompt = `Sağlık verilerindeki potansiyel riskleri analiz et:`;
+    
+    // Kalp atışı trendleri
+    if (currentMetrics.heartRate && currentMetrics.heartRate.length >= 3) {
+      const recent = currentMetrics.heartRate.slice(-3);
+      const values = recent.map(hr => hr.value);
+      prompt += `\nSon kalp atışları: ${values.join(', ')} BPM`;
+    }
+
+    // Uyku kalitesi
+    if (currentMetrics.sleep && currentMetrics.sleep.length >= 3) {
+      const recent = currentMetrics.sleep.slice(-3);
+      const avgSleep = recent.reduce((sum, s) => sum + s.duration, 0) / (recent.length * 60);
+      prompt += `\nOrtalama uyku: ${avgSleep.toFixed(1)} saat`;
+    }
+
+    prompt += `\n\nSadece önemli uyarılar ver (varsa):
+- Her satır ayrı bir uyarı
+- Kısa ve net (max 10 kelime)
+- Varsa acil durumları belirt
+- Eğer herşey normal ise "Normal" yaz`;
+
+    return prompt;
+  }
+
+  /**
+   * AI yanıtını parse et
+   */
   private parseHealthResponse(response: string, context: HealthContext): AIHealthResponse {
-    // Basit parsing - gerçek uygulamada daha sofistike olabilir
-    const recommendations = this.extractRecommendations(response);
-    const riskLevel = this.assessRiskLevel(context);
-    const insights = this.extractInsights(response);
+    const lines = response.split('\n').filter(line => line.trim());
+    
+    const insights: string[] = [];
+    const recommendations: string[] = [];
+    const alerts: string[] = [];
+    
+    // Basit parsing - gerçek projede daha gelişmiş olacak
+    lines.forEach(line => {
+      if (line.includes('öneri') || line.includes('tavsiye')) {
+        recommendations.push(line.trim());
+      } else if (line.includes('dikkat') || line.includes('uyar')) {
+        alerts.push(line.trim());
+      } else if (line.trim().length > 10) {
+        insights.push(line.trim());
+      }
+    });
 
     return {
-      analysis: response,
-      recommendations,
-      riskLevel,
-      insights,
-      confidence: 0.8,
-      lastUpdated: new Date().toISOString()
+      insights: insights.slice(0, 3),
+      recommendations: recommendations.slice(0, 3),
+      alerts: alerts.slice(0, 2),
+      confidence: 0.8, // Static for prototype
     };
   }
 
-  private extractRecommendations(response: string): string[] {
-    const recommendations: string[] = [];
-    const lines = response.split('\n');
-    
-    for (const line of lines) {
-      if (line.includes('öner') || line.includes('tavsiye') || line.includes('•') || line.includes('-')) {
-        const cleanLine = line.replace(/^[-•*]\s*/, '').trim();
-        if (cleanLine.length > 10) {
-          recommendations.push(cleanLine);
-        }
-      }
+  /**
+   * Uyarıları parse et
+   */
+  private parseAlerts(response: string): string[] {
+    if (response.toLowerCase().includes('normal')) {
+      return [];
     }
-
-    return recommendations.slice(0, 5); // En fazla 5 öneri
+    
+    return response
+      .split('\n')
+      .filter(line => line.trim() && line.trim() !== '-')
+      .map(line => line.replace(/^[-•]\s*/, '').trim())
+      .slice(0, 3);
   }
 
-  private assessRiskLevel(context: HealthContext): 'low' | 'medium' | 'high' {
-    let riskScore = 0;
-
-    // Vital değerleri kontrolü
-    if (context.vitals) {
-      const { heartRate, bloodPressure, temperature } = context.vitals;
-      
-      if (heartRate && (heartRate < 60 || heartRate > 100)) riskScore += 1;
-      if (bloodPressure && (bloodPressure.systolic > 140 || bloodPressure.diastolic > 90)) riskScore += 2;
-      if (temperature && (temperature < 36 || temperature > 37.5)) riskScore += 1;
-    }
-
-    // Semptom şiddeti
-    if (context.symptoms) {
-      const avgSeverity = context.symptoms.reduce((sum, s) => sum + s.severity, 0) / context.symptoms.length;
-      if (avgSeverity > 7) riskScore += 2;
-      else if (avgSeverity > 5) riskScore += 1;
-    }
-
-    if (riskScore >= 3) return 'high';
-    if (riskScore >= 1) return 'medium';
-    return 'low';
-  }
-
-  private extractInsights(response: string): string[] {
-    const insights: string[] = [];
-    const sentences = response.split(/[.!?]+/);
-    
-    for (const sentence of sentences) {
-      const cleanSentence = sentence.trim();
-      if (cleanSentence.length > 20 && 
-          (cleanSentence.includes('önemli') || 
-           cleanSentence.includes('dikkat') || 
-           cleanSentence.includes('normal'))) {
-        insights.push(cleanSentence);
-      }
-    }
-
-    return insights.slice(0, 3);
+  /**
+   * Sohbet geçmişini formatla
+   */
+  private formatChatHistory(history: ChatMessage[]) {
+    return history.slice(-6).map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
   }
 }

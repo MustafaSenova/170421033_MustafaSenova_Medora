@@ -1,8 +1,14 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-import { initializeAuth, getReactNativePersistence, connectAuthEmulator } from "firebase/auth";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeAuth, getReactNativePersistence, connectAuthEmulator, getAuth } from "firebase/auth";
+import { Platform } from 'react-native';
+
+// Platform-specific imports
+let AsyncStorage: any = null;
+if (Platform.OS !== 'web') {
+  AsyncStorage = require('@react-native-async-storage/async-storage').default;
+}
 
 // Firebase konfigürasyonu - mevcut projen
 const firebaseConfig = {
@@ -19,9 +25,13 @@ const app = initializeApp(firebaseConfig);
 
 // Firestore ve Auth servislerini al
 export const db = getFirestore(app);
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+
+// Platform-specific auth initialization
+export const auth = Platform.OS === 'web' 
+  ? getAuth(app) 
+  : initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage)
+    });
 
 // Network bağlantısı için timeout ayarları
 // Firestore offline support

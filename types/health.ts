@@ -1,89 +1,101 @@
-// Sağlık AI servisleri için type tanımları
+// Health data types adapted from main project
+export interface HeartRateData {
+  value: number;
+  timestamp: string;
+  status?: 'normal' | 'tachycardia' | 'bradycardia';
+}
 
-export interface VitalSigns {
-  heartRate?: number;
-  bloodPressure?: {
-    systolic: number;
-    diastolic: number;
-  };
-  temperature?: number;
-  oxygenSaturation?: number;
+export interface BloodPressureData {
+  systolic: number;
+  diastolic: number;
+  timestamp: string;
+  status?: 'normal' | 'elevated' | 'hypertension_1' | 'hypertension_2';
+}
+
+export interface SleepData {
+  duration: number; // minutes
+  quality?: 'poor' | 'fair' | 'good' | 'excellent';
+  timestamp: string;
+}
+
+export interface ActivityData {
+  steps: number;
+  calories: number;
+  distance?: number;
+  timestamp: string;
+}
+
+export interface HealthMetrics {
+  heartRate?: HeartRateData[];
+  bloodPressure?: BloodPressureData[];
+  sleep?: SleepData[];
+  activity?: ActivityData[];
   weight?: number;
   height?: number;
-  bloodSugar?: number;
-}
-
-export interface Symptom {
-  name: string;
-  severity: number; // 1-10 arası
-  duration?: string;
-  description?: string;
-}
-
-export interface Activity {
-  type: string;
-  duration: number; // dakika
-  calories?: number;
-  intensity?: 'low' | 'medium' | 'high';
-  date?: string;
-}
-
-export interface Demographics {
   age?: number;
   gender?: 'male' | 'female' | 'other';
-  conditions?: string[];
-  medications?: string[];
+}
+
+export interface UserProfile {
+  age: number;
+  gender: 'male' | 'female' | 'other';
+  weight?: number;
+  height?: number;
+  medicalHistory?: string[];
+  currentMedications?: string[];
   allergies?: string[];
 }
 
 export interface HealthContext {
-  vitals?: VitalSigns;
-  symptoms?: Symptom[];
-  activities?: Activity[];
-  demographics?: Demographics;
-  lastCheckup?: string;
-  notes?: string;
+  vitals?: {
+    heartRate?: number;
+    bloodPressure?: {
+      systolic: number;
+      diastolic: number;
+    };
+    temperature?: number;
+    weight?: number;
+    height?: number;
+  };
+  symptoms?: Array<{
+    name: string;
+    severity: number;
+    duration?: string;
+  }>;
+  activities?: Array<{
+    type: string;
+    duration: number;
+    calories?: number;
+    intensity?: 'low' | 'medium' | 'high';
+  }>;  demographics?: {
+    age: number;
+    gender?: string;
+    medicalHistory?: string[];
+    conditions?: string[];
+    medications?: string[];
+  };
+  userProfile?: UserProfile;
+  currentMetrics?: HealthMetrics;
+  timeframe?: '24h' | '7d' | '30d';
 }
 
 export interface AIHealthResponse {
-  analysis: string;
-  recommendations: string[];
-  riskLevel: 'low' | 'medium' | 'high';
   insights: string[];
-  confidence: number; // 0-1 arası
-  lastUpdated: string;
+  recommendations: string[];
+  alerts: string[];
+  riskLevel: 'low' | 'medium' | 'high';
   actionItems?: string[];
-  followUpRecommended?: boolean;
+  riskAssessment?: {
+    level: 'low' | 'moderate' | 'high';
+    factors: string[];
+  };
+  confidence: number; // 0-1
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  id: string;
+  role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-}
-
-export interface ChatResponse {
-  message: string;
-  suggestions?: string[];
-  relatedTopics?: string[];
-  confidence?: number;
-}
-
-// Samsung Health entegrasyonu için ek tipler
-export interface SamsungHealthData {
-  steps?: number;
-  heartRate?: number[];
-  sleep?: {
-    duration: number;
-    quality: 'poor' | 'fair' | 'good' | 'excellent';
-  };
-  activity?: Activity[];
-}
-
-// Mock data için helper tipler
-export interface MockHealthProfile {
-  userId: string;
-  profile: HealthContext;
-  riskFactors: string[];
-  goals: string[];
+  context?: HealthContext;
 }

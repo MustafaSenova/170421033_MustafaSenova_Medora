@@ -49,76 +49,83 @@ export class HybridAIService {
 
   async chatWithHealthAssistant(
     message: string, 
-    chatHistory: ChatMessage[] = [],
-    userContext?: HealthContext
+    context: HealthContext,
+    chatHistory: ChatMessage[] = []
   ): Promise<string> {
     if (this.useRealAI && this.realAI) {
       try {
         console.log('🤖 Trying real AI chat...');
-        const result = await this.realAI.chatWithHealthAssistant(message, chatHistory, userContext);
+        const result = await this.realAI.chatWithHealthAssistant(message, context, chatHistory);
         console.log('✅ Real AI chat successful');
         return result;
       } catch (error) {
         console.log('⚠️ Real AI chat failed, falling back to Mock AI');
-        console.log('Error:', error instanceof Error ? error.message : error);
         this.useRealAI = false;
-        return await this.mockAI.chatWithHealthAssistant(message, chatHistory, userContext);
+        return await this.mockAI.chatWithHealthAssistant(message, context, chatHistory);
       }
     }
     
     console.log('🎭 Using Mock AI chat');
-    return await this.mockAI.chatWithHealthAssistant(message, chatHistory, userContext);
+    return await this.mockAI.chatWithHealthAssistant(message, context, chatHistory);
   }
 
-  // Quick health tips without AI
-  getQuickHealthTips(): string[] {
-    return [
-      "💧 Günde en az 8 bardak su için",
-      "🚶‍♂️ Günde 10.000 adım atmaya çalışın",
-      "😴 7-9 saat kaliteli uyku alın",
-      "🥗 Günde 5 porsiyon meyve-sebze tüketin",
-      "🧘‍♀️ Stres yönetimi için nefes egzersizi yapın"
-    ];
+  async generateProactiveAlerts(context: HealthContext): Promise<string[]> {
+    if (this.useRealAI && this.realAI) {
+      try {
+        console.log('🤖 Trying real AI alerts...');
+        const result = await this.realAI.generateProactiveAlerts(context);
+        console.log('✅ Real AI alerts successful');
+        return result;
+      } catch (error) {
+        console.log('⚠️ Real AI alerts failed, falling back to Mock AI');
+        this.useRealAI = false;
+        return await this.mockAI.generateProactiveAlerts(context);
+      }
+    }
+    
+    console.log('🎭 Using Mock AI alerts');
+    return await this.mockAI.generateProactiveAlerts(context);
   }
 
-  // Emergency health guidance
-  getEmergencyGuidance(): string[] {
-    return [
-      "🚨 Göğüs ağrısı: Hemen 112'yi arayın",
-      "🤒 Yüksek ateş (39°C+): Doktor başvurusu",
-      "💔 Kalp çarpıntısı: Dinlenin, geçmezse doktor",
-      "🤢 Şiddetli mide bulantısı: Sıvı tüketin",
-      "😵 Baş dönmesi: Oturun, su için"
-    ];
+  async generateHealthReport(context: HealthContext): Promise<string> {
+    console.log('📋 Generating comprehensive health report with Mock AI');
+    return await this.mockAI.generateHealthReport(context);
   }
 
-  // Health status check
-  isServiceAvailable(): boolean {
-    return true; // Mock AI her zaman mevcut
+  getServiceType(): 'real' | 'mock' | 'hybrid' {
+    if (this.useRealAI) return 'real';
+    return this.realAI ? 'hybrid' : 'mock';
+  }
+
+  isUsingRealAI(): boolean {
+    return this.useRealAI;
   }
 
   getServiceStatus(): string {
-    if (this.useRealAI) {
-      return '🤖 OpenAI Aktif';
-    } else {
-      return '🎭 Mock AI Aktif';
-    }
+    return this.useRealAI ? 'real' : 'mock';
   }
 }
 
-// Singleton instance for global use
-let hybridAI: HybridAIService | null = null;
+// Export fonksiyonları - SORUN DÜZELTME
+let globalAIInstance: HybridAIService | null = null;
 
-export const initializeAI = (apiKey?: string): HybridAIService => {
-  if (!hybridAI) {
-    hybridAI = new HybridAIService(apiKey);
+/**
+ * AI instance'ını başlat ve döndür
+ */
+export function initializeAI(apiKey?: string, model?: string): HybridAIService {
+  if (!globalAIInstance) {
+    const key = apiKey || process.env.OPENAI_API_KEY;
+    globalAIInstance = new HybridAIService(key, model);
   }
-  return hybridAI;
-};
+  return globalAIInstance;
+}
 
-export const getAI = (): HybridAIService => {
-  if (!hybridAI) {
-    hybridAI = new HybridAIService(); // Mock AI as fallback
+/**
+ * Mevcut AI instance'ını döndür
+ */
+export function getAI(): HybridAIService {
+  if (!globalAIInstance) {
+    return initializeAI();
   }
-  return hybridAI;
-};
+  return globalAIInstance;
+}
