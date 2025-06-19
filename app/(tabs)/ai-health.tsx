@@ -17,7 +17,8 @@ import { HealthContext, ChatMessage } from '../../types/health';
 import { colors } from '../../constants/theme';
 import { scale, verticalScale } from '../../utils/styling';
 import * as Icons from 'phosphor-react-native';
-import { router } from 'expo-router';
+import ScreenWrapper from '@/components/ScreenWrapper';
+import Typo from '@/components/Typo';
 
 // Helper functions
 const wp = (percentage: number) => scale(percentage * 3.75);
@@ -42,46 +43,64 @@ interface DisplayChatMessage extends ChatMessage {
   isLoading?: boolean;
 }
 
-export default function AIHealthScreen() {
+const AIHealthScreen = () => {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<DisplayChatMessage[]>([]);
+  
+  // Chat functionality
+  const getWelcomeMessage = () => {
+    const userName = user?.firstName || 'Değerli kullanıcı';
+    return `Merhaba ${userName}! Ben sağlık asistanınızım. Size şu konularda yardımcı olabilirim:\n\n• Sağlık verilerinizi analiz etmek\n• Sağlık tavsiyesi vermek\n• Semptomlarınızı değerlendirmek\n• İlaç ve tedavi hakkında bilgi vermek\n\nNasıl yardımcı olabilirim?`;
+  };
+
+  const [messages, setMessages] = useState<DisplayChatMessage[]>([
+    {
+      id: '1',
+      content: getWelcomeMessage(),
+      role: 'assistant',
+      timestamp: Date.now().toString(),
+    }
+  ]);
   const [inputText, setInputText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Hoş geldin mesajı
+  // Update welcome message when user data changes
   useEffect(() => {
-    const welcomeMessage: DisplayChatMessage = {
-      id: '1',
-      role: 'assistant',
-      content: `Merhaba ${user?.firstName || 'Kullanıcı'}! 👋\n\nBen sağlık asistanınızım. Size şu konularda yardımcı olabilirim:\n\n• Sağlık verilerinizi analiz etmek\n• Sağlık tavsiyesi vermek\n• Semptomlarınızı değerlendirmek\n• İlaç ve tedavi hakkında bilgi vermek\n\nNasıl yardımcı olabilirim?`,
-      timestamp: new Date().toISOString()
-    };
-    setMessages([welcomeMessage]);
-  }, [user]);
+    setMessages([
+      {
+        id: '1',
+        content: getWelcomeMessage(),
+        role: 'assistant',
+        timestamp: Date.now().toString(),
+      }
+    ]);
+  }, [user?.firstName]);
 
-  // Mesaj gönderme
-  const sendMessage = async () => {
-    if (!inputText.trim() || isLoading) return;
+  // Suggested chat examples
+  const suggestedChats = [
+    "Kalp hızım normal mi?",
+    "Kan basıncım yüksek, ne yapmalıyım?",
+    "Uyku kalitemi nasıl artırabilirim?",
+    "Egzersiz önerileriniz neler?",
+    "Beslenme tavsiyesi ver",
+    "Stres seviyem yüksek, yardım edin"
+  ];
+
+  // Chat functions
+  const sendMessage = async (messageText?: string) => {
+    const textToSend = messageText || inputText.trim();
+    if (!textToSend) return;
 
     const userMessage: DisplayChatMessage = {
       id: Date.now().toString(),
+      content: textToSend,
       role: 'user',
-      content: inputText.trim(),
-      timestamp: new Date().toISOString()
+      timestamp: Date.now().toString(),
     };
 
-    const loadingMessage: DisplayChatMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: 'Düşünüyorum...',
-      timestamp: new Date().toISOString(),
-      isLoading: true
-    };
-
-    setMessages(prev => [...prev, userMessage, loadingMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInputText('');
-    setIsLoading(true);
+    setChatLoading(true);
 
     // Scroll to bottom
     setTimeout(() => {
@@ -89,352 +108,322 @@ export default function AIHealthScreen() {
     }, 100);
 
     try {
-      // Basit sağlık context'i oluştur
+      // Prepare health context
       const healthContext: HealthContext = {
+        vitals: {
+          heartRate: 75,
+          bloodPressure: { systolic: 120, diastolic: 80 },
+          weight: 70,
+          height: 170,
+        },
         demographics: {
           age: 30,
-          gender: 'male'
-        }
+          gender: 'male',
+          medicalHistory: [],
+          conditions: [],
+          medications: [],
+        },
+        timeframe: '24h',
       };
 
+      // Get AI response
       const ai = getAI();
-      const response = await ai.chatWithHealthAssistant(
-        inputText.trim(), 
-        healthContext, 
-        messages.filter(m => !m.isLoading).slice(-5) // Son 5 mesajı context olarak gönder
-      );
+      const response = await ai.chatWithHealthAssistant(textToSend, healthContext);
 
-      // Loading mesajını gerçek yanıtla değiştir
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.isLoading ? {
-            ...msg,
-            content: response,
-            isLoading: false
-          } : msg
-        )
-      );
-      
-    } catch (error) {
-      console.error('AI yanıt hatası:', error);
-      
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.isLoading ? {
-            ...msg,
-            content: 'Üzgünüm, şu anda yanıt veremiyorum. Lütfen daha sonra tekrar deneyin.',
-            isLoading: false
-          } : msg
-        )
-      );
-    } finally {
-      setIsLoading(false);
+      const aiMessage: DisplayChatMessage = {
+        id: (Date.now() + 1).toString(),
+        content: response,
+        role: 'assistant',
+        timestamp: Date.now().toString(),
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+
+      // Auto scroll to bottom
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
+
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage: DisplayChatMessage = {
+        id: (Date.now() + 1).toString(),
+        content: 'Üzgünüm, şu anda bir hata oluştu. Lütfen tekrar deneyin.',
+        role: 'assistant',
+        timestamp: Date.now().toString(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setChatLoading(false);
     }
   };
 
-  // Hızlı sorular
-  const quickQuestions = [
-    "Kalp sağlığı için ne önerirsin?",
-    "Beslenme tavsiyesi ver",  
-    "Egzersiz programı öner",
-    "Stres yönetimi hakkında bilgi ver"
-  ];
-
-  const askQuickQuestion = (question: string) => {
-    setInputText(question);
+  const clearChat = () => {
+    setMessages([
+      {
+        id: '1',
+        content: getWelcomeMessage(),
+        role: 'assistant',
+        timestamp: Date.now().toString(),
+      }
+    ]);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Icons.Robot size={24} color={theme.colors.primary} weight="fill" />
-          <Text style={styles.headerTitle}>AI Sağlık Asistanı</Text>
+        <View style={styles.headerLeft}>
+          <Icons.Robot size={24} color={colors.primary} weight="fill" />
+          <Typo size={20} fontWeight="700" color={colors.white}>AI Sağlık Asistanı</Typo>
         </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.assessmentButton}
-            onPress={() => router.push('/ai-health-assessment')}
-          >
-            <Icons.Brain size={20} color={theme.colors.primary} weight="fill" />
-            <Text style={styles.assessmentButtonText}>Değerlendirme</Text>
-          </TouchableOpacity>
-          <View style={styles.statusIndicator}>
-            <View style={[styles.statusDot, { backgroundColor: theme.colors.success }]} />
-            <Text style={styles.statusText}>Aktif</Text>
-          </View>
+        <View style={styles.statusIndicator}>
+          <View style={styles.statusDot} />
+          <Typo size={12} color={colors.green}>Aktif</Typo>
         </View>
       </View>
 
-      {/* Chat Messages */}
-      <ScrollView 
-        ref={scrollViewRef}
-        style={styles.messagesContainer}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.messagesContent}
+      <KeyboardAvoidingView 
+        style={styles.chatContainer} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {messages.map((message) => (
-          <View 
-            key={message.id} 
-            style={[
-              styles.messageContainer,
-              message.role === 'user' ? styles.userMessage : styles.assistantMessage
-            ]}
-          >
-            {message.role === 'assistant' && (
-              <View style={styles.assistantIcon}>
-                <Icons.Robot size={20} color={theme.colors.primary} weight="fill" />
-              </View>
-            )}
-            <View style={[
-              styles.messageBubble,
-              message.role === 'user' ? styles.userBubble : styles.assistantBubble
-            ]}>
-              <Text style={[
-                styles.messageText,
-                message.role === 'user' ? styles.userText : styles.assistantText
-              ]}>
-                {message.content}
-              </Text>
-              {message.isLoading && (
-                <View style={styles.loadingDots}>
-                  <Text style={styles.loadingText}>●●●</Text>
+        {/* Chat Messages */}
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.messagesContainer}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.messagesContent}
+        >
+          {messages.map((message) => (
+            <View
+              key={message.id}
+              style={[
+                styles.messageContainer,
+                message.role === 'user' ? styles.userMessage : styles.aiMessage,
+              ]}
+            >
+              {message.role === 'assistant' && (
+                <View style={styles.aiAvatar}>
+                  <Icons.Robot size={16} color={colors.primary} weight="fill" />
                 </View>
               )}
+              <View style={[
+                styles.messageBubble,
+                message.role === 'user' ? styles.userBubble : styles.aiBubble,
+              ]}>
+                <Typo 
+                  size={14} 
+                  color={message.role === 'user' ? colors.white : colors.text}
+                  style={styles.messageText}
+                >
+                  {message.content}
+                </Typo>
+              </View>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+          
+          {chatLoading && (
+            <View style={[styles.messageContainer, styles.aiMessage]}>
+              <View style={styles.aiAvatar}>
+                <Icons.Robot size={16} color={colors.primary} weight="fill" />
+              </View>
+              <View style={[styles.messageBubble, styles.aiBubble]}>
+                <View style={styles.typingIndicator}>
+                  <View style={[styles.typingDot, { animationDelay: '0ms' }]} />
+                  <View style={[styles.typingDot, { animationDelay: '150ms' }]} />
+                  <View style={[styles.typingDot, { animationDelay: '300ms' }]} />
+                </View>
+              </View>
+            </View>
+          )}
 
-      {/* Quick Questions */}
-      {messages.length <= 1 && (
-        <View style={styles.quickQuestionsContainer}>
-          <Text style={styles.quickQuestionsTitle}>Hızlı Sorular:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {quickQuestions.map((question, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.quickQuestionButton}
-                onPress={() => askQuickQuestion(question)}
-              >
-                <Text style={styles.quickQuestionText}>{question}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+          {/* Suggested Chats - Show after first message */}
+          {messages.length === 1 && (
+            <View style={styles.suggestedContainer}>
+              <View style={styles.suggestedGrid}>
+                {suggestedChats.map((chat, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestedChat}
+                    onPress={() => sendMessage(chat)}
+                  >
+                    <Typo size={13} color={colors.primary} style={styles.suggestedText}>
+                      {chat}
+                    </Typo>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+        </ScrollView>
 
-      {/* Input Area */}
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.inputContainer}
-      >
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.textInput}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Sağlık hakkında bir soru sorun..."
-            placeholderTextColor={theme.colors.textSecondary}
-            multiline
-            maxLength={500}
-            onSubmitEditing={sendMessage}
-            returnKeyType="send"
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!inputText.trim() || isLoading) && styles.sendButtonDisabled
-            ]}
-            onPress={sendMessage}
-            disabled={!inputText.trim() || isLoading}
-          >
-            <Icons.PaperPlaneTilt 
-              size={20} 
-              color={(!inputText.trim() || isLoading) ? theme.colors.textSecondary : theme.colors.white} 
-              weight="fill" 
+        {/* Chat Input */}
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.textInput}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Sağlık hakkında bir soru sorun..."
+              placeholderTextColor={colors.neutral500}
+              multiline
+              maxLength={500}
+              onSubmitEditing={() => sendMessage()}
             />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sendButton, (!inputText.trim() || chatLoading) && styles.sendButtonDisabled]}
+              onPress={() => sendMessage()}
+              disabled={!inputText.trim() || chatLoading}
+            >
+              <Icons.PaperPlaneTilt size={18} color={colors.white} weight="fill" />
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
-}
+};
+
+export default AIHealthScreen;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(2),
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderBottomColor: colors.neutral800,
   },
-  headerContent: {
+  headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  assessmentButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  assessmentButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme.colors.primary,
   },
   statusIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    backgroundColor: colors.green,
   },
-  statusText: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
+  chatContainer: {
+    flex: 1,
   },
   messagesContainer: {
     flex: 1,
   },
   messagesContent: {
-    padding: wp(4),
-    gap: hp(1),
+    padding: 16,
+    paddingBottom: 20,
   },
   messageContainer: {
+    marginVertical: 8,
     flexDirection: 'row',
-    marginVertical: hp(0.5),
+    alignItems: 'flex-start',
   },
   userMessage: {
     justifyContent: 'flex-end',
   },
-  assistantMessage: {
+  aiMessage: {
     justifyContent: 'flex-start',
   },
-  assistantIcon: {
+  aiAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme.colors.primaryLight,
-    justifyContent: 'center',
+    backgroundColor: colors.neutral800,
     alignItems: 'center',
-    marginRight: 8,
+    justifyContent: 'center',
+    marginRight: 12,
     marginTop: 4,
   },
   messageBubble: {
-    maxWidth: '80%',
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(1.5),
-    borderRadius: 16,
+    maxWidth: '75%',
+    padding: 16,
+    borderRadius: 20,
   },
   userBubble: {
-    backgroundColor: theme.colors.primary,
-    marginLeft: wp(15),
+    backgroundColor: colors.primary,
+    borderBottomRightRadius: 6,
+    marginLeft: 'auto',
   },
-  assistantBubble: {
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+  aiBubble: {
+    backgroundColor: colors.neutral800,
+    borderBottomLeftRadius: 6,
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 22,
+    lineHeight: 20,
   },
-  userText: {
-    color: theme.colors.white,
+  typingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  assistantText: {
-    color: theme.colors.text,
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.neutral400,
   },
-  loadingDots: {
-    marginTop: 4,
+  suggestedContainer: {
+    marginTop: 20,
   },
-  loadingText: {
-    color: theme.colors.textSecondary,
-    fontSize: 12,
+  suggestedGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  quickQuestionsContainer: {
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(2),
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  quickQuestionsTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme.colors.textSecondary,
-    marginBottom: hp(1),
-  },
-  quickQuestionButton: {
-    backgroundColor: theme.colors.surface,
+  suggestedChat: {
+    backgroundColor: colors.neutral800,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(1),
-    borderRadius: 12,
-    marginRight: wp(2),
+    borderColor: colors.primary + '30',
+    minWidth: '45%',
+    flexGrow: 1,
   },
-  quickQuestionText: {
-    fontSize: 13,
-    color: theme.colors.text,
+  suggestedText: {
+    textAlign: 'center',
   },
   inputContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.neutral900,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderTopColor: colors.neutral800,
   },
-  inputRow: {
+  inputWrapper: {
     flexDirection: 'row',
-    padding: wp(4),
-    gap: wp(2),
     alignItems: 'flex-end',
+    backgroundColor: colors.neutral800,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 12,
   },
   textInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 20,
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1.5),
-    fontSize: 16,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.background,
-    maxHeight: hp(12),
+    color: colors.white,
+    fontSize: 14,
+    maxHeight: 100,
+    paddingVertical: 8,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: theme.colors.border,
+    opacity: 0.5,
   },
 });

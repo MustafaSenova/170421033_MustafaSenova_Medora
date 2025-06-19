@@ -148,10 +148,10 @@ export default function HealthDataScreen() {
             if (result.success) {
               Alert.alert('Başarılı', `${result.syncedDays} günlük veri senkronize edildi.`);
               await fetchHealthData();
-            } else {
+    } else {
               Alert.alert('Hata', 'Senkronizasyon başarısız oldu.');
             }
-          } catch (error) {
+      } catch (error) {
             console.error('❌ Manuel senkronizasyon hatası:', error);
             Alert.alert('Hata', 'Senkronizasyon sırasında bir hata oluştu.');
           } finally {
@@ -387,8 +387,8 @@ export default function HealthDataScreen() {
                   </Typo>
                   <Typo size={12} color={theme.colors.textSecondary}>
                     km • Mesafe
-                  </Typo>
-                </View>
+            </Typo>
+              </View>
               )}
 
               {/* Kilo */}
@@ -409,7 +409,7 @@ export default function HealthDataScreen() {
                   <Typo size={12} color={theme.colors.textSecondary}>
                     kg • Kilo
                   </Typo>
-                </View>
+            </View>
               )}
 
               {/* Kan Basıncı */}
@@ -429,9 +429,9 @@ export default function HealthDataScreen() {
                   </Typo>
                   <Typo size={12} color={theme.colors.textSecondary}>
                     mmHg • Kan Basıncı
-                  </Typo>
+              </Typo>
                 </View>
-              )}
+            )}
             </View>
           </View>
         )}
@@ -540,8 +540,8 @@ export default function HealthDataScreen() {
               >
                 <Typo size={16} fontWeight="600" color="white">
                   Google Fit'e Bağlan
-                </Typo>
-              </Button>
+              </Typo>
+            </Button>
             )}
           </View>
         )}

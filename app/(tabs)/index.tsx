@@ -10,6 +10,10 @@ import * as Icons from 'phosphor-react-native'
 import ScreenWrapper from '@/components/ScreenWrapper';
 import { useAuth } from '@/contexts/authContext';
 import { useRouter } from 'expo-router';
+import { cardioAIService, CardioRiskResult } from '@/services/ai/cardioAI';
+import { dataManager, UserHealthProfile } from '@/utils/dataManager';
+import { APP_CONFIG } from '@/constants/config';
+
 
 const HomeScreen = () => {
   const { user } = useAuth();
@@ -113,126 +117,212 @@ const DoctorHomeScreen = () => {
 
 const PatientHomeScreen = () => {
   const { user } = useAuth();
-  const [formData, setFormData] = useState({
-    age: '',
-    height: '',
-    weight: '',
-    ap_hi: '',
-    ap_lo: '',
-    cholesterol: '1', // 1: normal, 2: yüksek, 3: çok yüksek
-    gluc: '1', // 1: normal, 2: yüksek, 3: çok yüksek
-    smoke: false,
-    alco: false,
-    active: false,
-  });
+  const router = useRouter();
+  const [cardioRisk, setCardioRisk] = useState<CardioRiskResult | null>(null);
+  const [isLoadingRisk, setIsLoadingRisk] = useState(false);
 
-  const handlePredict = async () => {
-    // Tahmin işlemleri burada
-  };
+  // Kardiyovasküler risk analizi yap
+  useEffect(() => {
+    const performRiskAnalysis = async () => {
+      if (!user?.uid) return;
+      
+      try {
+        setIsLoadingRisk(true);
+        
+        // Kullanıcı profili hazırla
+        const userProfile: UserHealthProfile = {
+          age: user.healthProfile?.age || 30,
+          gender: user.healthProfile?.gender || 'male',
+          height: user.healthProfile?.height || 170,
+          weight: user.healthProfile?.weight || 70,
+          bloodPressure: user.healthProfile?.bloodPressure,
+          cholesterol: user.healthProfile?.cholesterol || 1,
+          glucose: user.healthProfile?.glucose || 1,
+          smoking: user.healthProfile?.smoking || false,
+          alcohol: user.healthProfile?.alcohol || false,
+          physicalActivity: user.healthProfile?.physicalActivity || false,
+          manualEntries: user.healthProfile?.manualEntries || {}
+        };
+
+        // Mock/Google Fit verilerini al (şimdilik boş array)
+        const healthData: any[] = [];
+        
+        console.log('🔄 Ana sayfa risk analizi başlıyor...', {
+          useMockData: APP_CONFIG.USE_MOCK_DATA,
+          userProfile: Object.keys(userProfile).length
+        });
+        
+        const result = await cardioAIService.analyzeFromHealthData(healthData, userProfile);
+        setCardioRisk(result);
+      } catch (error) {
+        console.error('Risk analizi hatası:', error);
+      } finally {
+        setIsLoadingRisk(false);
+      }
+    };
+
+    performRiskAnalysis();
+  }, [user]);
+
+  const aiHealthMenuItems = [
+    {
+      title: 'Kardiyovasküler Risk',
+      subtitle: 'Kalp hastalığı risk analizinizi yapın',
+      icon: <Icons.Heart size={verticalScale(32)} color={colors.rose} weight="fill" />,
+      onPress: () => router.push('/ai-health-assessment'),
+      bgColor: 'rgba(239, 68, 68, 0.1)',
+      borderColor: 'rgba(239, 68, 68, 0.3)',
+    },
+    {
+      title: 'EKG Analizi',
+      subtitle: 'Elektrokardiyogram verilerinizi analiz edin',
+      icon: <Icons.Pulse size={verticalScale(32)} color={colors.green} weight="fill" />,
+      onPress: () => router.push('/ai-health-assessment'),
+      bgColor: 'rgba(34, 197, 94, 0.1)',
+      borderColor: 'rgba(34, 197, 94, 0.3)',
+    },
+    {
+      title: 'Sağlık Verileri',
+      subtitle: 'Google Fit verilerinizi görüntüleyin',
+      icon: <Icons.ChartLine size={verticalScale(32)} color={colors.primary} weight="fill" />,
+      onPress: () => router.push('/(tabs)/health-data'),
+      bgColor: 'rgba(59, 130, 246, 0.1)',
+      borderColor: 'rgba(59, 130, 246, 0.3)',
+    },
+    {
+      title: 'AI Sağlık Asistanı',
+      subtitle: 'Kişiselleştirilmiş sağlık önerileri alın',
+      icon: <Icons.Robot size={verticalScale(32)} color={colors.purple} weight="fill" />,
+      onPress: () => router.push('/(tabs)/ai-health'),
+      bgColor: 'rgba(147, 51, 234, 0.1)',
+      borderColor: 'rgba(147, 51, 234, 0.3)',
+    },
+  ];
 
   return (
     <ScreenWrapper>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.patientHeader}>
-          <Typo size={24} fontWeight="800" color={colors.white}>
+          <Typo size={28} fontWeight="800" color={colors.white}>
             Merhaba, {user?.firstName}
           </Typo>
-          <Typo size={14} color={colors.textLighter}>
-            Sağlık verilerinizi takip edin ve risk analizlerinizi yapın
+          <Typo size={16} color={colors.textLighter}>
+            AI destekli sağlık analizlerinizi yapın
           </Typo>
         </View>
 
-        <View style={styles.form}>
-          <Typo size={20} fontWeight="800" style={styles.title}>
-            Kardiyovasküler Risk Tahmini
-          </Typo>
-          <Typo size={14} color={colors.textLighter} style={styles.subtitle}>
-            Sağlık verilerinizi girerek risk seviyenizi öğrenebilirsiniz.
-          </Typo>
-
-          <Input
-            placeholder="Yaş"
-            keyboardType="numeric"
-            onChangeText={v => setFormData({ ...formData, age: v })}
-            icon={<Icons.User size={verticalScale(26)} color={colors.neutral350} weight="fill" />}
-          />
-
-          <Input
-            placeholder="Boy (cm)"
-            keyboardType="numeric"
-            onChangeText={v => setFormData({ ...formData, height: v })}
-            icon={<Icons.Ruler size={verticalScale(26)} color={colors.neutral350} weight="fill" />}
-          />
-
-          <Input
-            placeholder="Kilo (kg)"
-            keyboardType="numeric"
-            onChangeText={v => setFormData({ ...formData, weight: v })}
-            icon={<Icons.Scales size={verticalScale(26)} color={colors.neutral350} weight="fill" />}
-          />
-
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Typo size={14} color={colors.textLighter} style={styles.inputLabel}>
-                Üst Tansiyon (Sistolik)
+        {/* Kardiyovasküler Risk Kartı */}
+        {cardioRisk && (
+          <View style={styles.riskCard}>
+            <View style={styles.riskHeader}>
+              <Icons.Heart size={verticalScale(24)} color={colors.rose} weight="fill" />
+              <Typo size={18} fontWeight="700" color={colors.white} style={{ marginLeft: spacingX._10 }}>
+                Kardiyovasküler Risk Durumunuz
               </Typo>
-              <Input
-                placeholder="Örnek: 120"
-                keyboardType="numeric"
-                onChangeText={v => setFormData({ ...formData, ap_hi: v })}
-                icon={<Icons.ArrowUp size={verticalScale(26)} color={colors.neutral350} weight="fill" />}
-              />
             </View>
-
-            <View style={{ flex: 1 }}>
-              <Typo size={14} color={colors.textLighter} style={styles.inputLabel}>
-                Alt Tansiyon (Diyastolik)
-              </Typo>
-              <Input
-                placeholder="Örnek: 80"
-                keyboardType="numeric"
-                onChangeText={v => setFormData({ ...formData, ap_lo: v })}
-                icon={<Icons.ArrowDown size={verticalScale(26)} color={colors.neutral350} weight="fill" />}
-              />
+            <View style={styles.riskContent}>
+              <View style={styles.riskScore}>
+                <Typo size={32} fontWeight="800" color={cardioAIService.getRiskLevelInfo(cardioRisk.riskLevel).color}>
+                  %{cardioRisk.riskPercentage}
+                </Typo>
+                <Typo size={16} fontWeight="600" color={cardioAIService.getRiskLevelInfo(cardioRisk.riskLevel).color}>
+                  {cardioAIService.getRiskLevelInfo(cardioRisk.riskLevel).label}
+                </Typo>
+              </View>
+              <TouchableOpacity 
+                style={styles.riskButton}
+                onPress={() => router.push('/ai-health-assessment')}
+              >
+                <Typo size={14} fontWeight="600" color={colors.primary}>
+                  Detayları Gör
+                </Typo>
+                <Icons.ArrowRight size={verticalScale(16)} color={colors.primary} weight="bold" />
+              </TouchableOpacity>
             </View>
           </View>
+        )}
 
-          <View style={styles.switchContainer}>
-            <Typo size={14} color={colors.text}>Sigara Kullanıyorum:</Typo>
-            <Switch
-              value={formData.smoke}
-              onValueChange={v => setFormData({ ...formData, smoke: v })}
-              trackColor={{ false: colors.neutral200, true: colors.primary }}
-              thumbColor={formData.smoke ? colors.white : colors.neutral400}
-            />
-          </View>
-
-          <View style={styles.switchContainer}>
-            <Typo size={14} color={colors.text}>Alkol Kullanıyorum:</Typo>
-            <Switch
-              value={formData.alco}
-              onValueChange={v => setFormData({ ...formData, alco: v })}
-              trackColor={{ false: colors.neutral200, true: colors.primary }}
-              thumbColor={formData.alco ? colors.white : colors.neutral400}
-            />
-          </View>
-
-          <View style={styles.switchContainer}>
-            <Typo size={14} color={colors.text}>Fiziksel Olarak Aktifim:</Typo>
-            <Switch
-              value={formData.active}
-              onValueChange={v => setFormData({ ...formData, active: v })}
-              trackColor={{ false: colors.neutral200, true: colors.primary }}
-              thumbColor={formData.active ? colors.white : colors.neutral400}
-            />
-          </View>
-
-          <Button onPress={handlePredict} style={styles.button}>
-            <Typo fontWeight="700" color={colors.black} size={18}>
-              Riskimi Hesapla
-            </Typo>
-          </Button>
+        <View style={styles.sectionHeader}>
+          <Icons.Brain size={verticalScale(24)} color={colors.primary} weight="fill" />
+          <Typo size={20} fontWeight="700" color={colors.white} style={{ marginLeft: spacingX._10 }}>
+            AI Sağlık Analizi
+          </Typo>
         </View>
+
+        <View style={styles.menuGrid}>
+          {aiHealthMenuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.aiMenuItem, { 
+                backgroundColor: item.bgColor,
+                borderColor: item.borderColor,
+              }]}
+              onPress={item.onPress}
+            >
+              <View style={styles.aiMenuIcon}>
+                {item.icon}
+              </View>
+              <View style={styles.menuContent}>
+                <Typo size={18} fontWeight="700" color={colors.white}>
+                  {item.title}
+                </Typo>
+                <Typo size={14} color={colors.textLighter} textProps={{ numberOfLines: 2 }}>
+                  {item.subtitle}
+                </Typo>
+              </View>
+              <Icons.CaretRight size={verticalScale(20)} color={colors.textLighter} weight="bold" />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.quickStatsContainer}>
+          <Typo size={18} fontWeight="700" color={colors.white} style={{ marginBottom: spacingY._15 }}>
+            Hızlı Erişim
+          </Typo>
+          
+          <View style={styles.quickStatsGrid}>
+            <TouchableOpacity 
+              style={styles.quickStatItem}
+              onPress={() => router.push('/(tabs)/health-metrics')}
+            >
+              <Icons.Heartbeat size={verticalScale(24)} color={colors.rose} weight="fill" />
+              <Typo size={12} color={colors.textLighter} style={{ textAlign: 'center' }}>
+                Sağlık Metrikleri
+              </Typo>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.quickStatItem}
+              onPress={() => router.push('/(tabs)/graphs')}
+            >
+              <Icons.ChartBar size={verticalScale(24)} color={colors.green} weight="fill" />
+              <Typo size={12} color={colors.textLighter} style={{ textAlign: 'center' }}>
+                Grafikler
+              </Typo>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.quickStatItem}
+              onPress={() => router.push('/(tabs)/appointments')}
+            >
+              <Icons.Calendar size={verticalScale(24)} color={colors.primary} weight="fill" />
+              <Typo size={12} color={colors.textLighter} style={{ textAlign: 'center' }}>
+                Randevular
+              </Typo>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.quickStatItem}
+              onPress={() => router.push('/(tabs)/profile')}
+            >
+              <Icons.User size={verticalScale(24)} color={colors.purple} weight="fill" />
+              <Typo size={12} color={colors.textLighter} style={{ textAlign: 'center' }}>
+                Profil
+              </Typo>
+            </TouchableOpacity>
+          </View>
+        </View>
+
       </ScrollView>
     </ScreenWrapper>
   );
@@ -306,4 +396,75 @@ const styles = StyleSheet.create({
   inputLabel: {
     marginBottom: spacingY._5,
   },
+  riskCard: {
+    backgroundColor: colors.neutral900,
+    padding: spacingX._20,
+    borderRadius: 16,
+    marginBottom: spacingY._20,
+    borderWidth: 1,
+    borderColor: colors.neutral700,
+  },
+  riskHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacingY._15,
+  },
+  riskContent: {
+    gap: spacingY._10,
+  },
+  riskScore: {
+    alignItems: 'center',
+    gap: spacingY._5,
+  },
+  riskButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary + '20',
+    paddingVertical: spacingY._10,
+    paddingHorizontal: spacingX._15,
+    borderRadius: 8,
+    gap: spacingX._8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacingY._20,
+  },
+  aiMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacingX._15,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: spacingY._10,
+  },
+  aiMenuIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacingX._15,
+  },
+  quickStatsContainer: {
+    marginTop: spacingY._20,
+  },
+  quickStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: spacingY._10,
+  },
+  quickStatItem: {
+    width: '48%',
+    backgroundColor: colors.neutral900,
+    padding: spacingX._15,
+    borderRadius: 12,
+    alignItems: 'center',
+    gap: spacingY._8,
+    borderWidth: 1,
+    borderColor: colors.neutral700,
+  },
+
 });

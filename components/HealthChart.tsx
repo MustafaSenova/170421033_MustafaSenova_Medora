@@ -232,41 +232,67 @@ export const HealthChart: React.FC<HealthChartProps> = ({ data, type, title }) =
     const totalCalories = latest.calories || 0;
     const heartRate = latest.heartRate || 0;
 
+    // Daha anlamlı hedef yüzdeleri hesapla
+    const stepsGoal = 10000; // Günlük adım hedefi
+    const caloriesGoal = 2000; // Günlük kalori hedefi
+    const heartRateNormal = 70; // Normal dinlenme kalp hızı
+
+    const stepsPercentage = Math.min(Math.round((totalSteps / stepsGoal) * 100), 100);
+    const caloriesPercentage = Math.min(Math.round((totalCalories / caloriesGoal) * 100), 100);
+    const heartRateScore = Math.max(30, Math.min(100, 100 - Math.abs(heartRate - heartRateNormal)));
+
     const pieData = [
       {
-        name: 'Adım',
-        population: Math.round((totalSteps / 15000) * 100), // Target: 15000 steps
+        name: `Adım: ${totalSteps.toLocaleString()}`,
+        population: stepsPercentage,
         color: colors.primary,
-        legendFontColor: 'rgba(255,255,255,0.8)',
+        legendFontColor: 'rgba(255,255,255,0.9)',
         legendFontSize: 12,
       },
       {
-        name: 'Kalori',
-        population: Math.round((totalCalories / 2000) * 100), // Target: 2000 calories
+        name: `Kalori: ${Math.round(totalCalories)} kcal`,
+        population: caloriesPercentage,
         color: colors.orange,
-        legendFontColor: 'rgba(255,255,255,0.8)',
+        legendFontColor: 'rgba(255,255,255,0.9)',
         legendFontSize: 12,
       },
       {
-        name: 'Kalp Hızı',
-        population: Math.round((heartRate / 100) * 100), // Relative to 100 bpm
+        name: `Kalp: ${heartRate} bpm`,
+        population: heartRateScore,
         color: colors.rose,
-        legendFontColor: 'rgba(255,255,255,0.8)',
+        legendFontColor: 'rgba(255,255,255,0.9)',
         legendFontSize: 12,
       },
     ];
 
     return (
-      <PieChart
-        data={pieData}
-        width={chartWidth}
-        height={200}
-        chartConfig={chartConfig}
-        accessor="population"
-        backgroundColor="transparent"
-        paddingLeft="15"
-        style={styles.chart}
-      />
+      <View>
+        <PieChart
+          data={pieData}
+          width={chartWidth}
+          height={220}
+          chartConfig={chartConfig}
+          accessor="population"
+          backgroundColor="transparent"
+          paddingLeft="15"
+          style={styles.chart}
+          hasLegend={true}
+        />
+        
+        {/* Açıklayıcı bilgi ekle */}
+        <View style={styles.overviewExplanation}>
+          <Text style={styles.explanationTitle}>Değerler nasıl hesaplanıyor?</Text>
+          <Text style={styles.explanationText}>
+            • Adım: Günlük {stepsGoal.toLocaleString()} adım hedefine göre tamamlanma oranı
+          </Text>
+          <Text style={styles.explanationText}>
+            • Kalori: Günlük {caloriesGoal} kcal hedefine göre tamamlanma oranı
+          </Text>
+          <Text style={styles.explanationText}>
+            • Kalp Hızı: Normal dinlenme kalp hızına ({heartRateNormal} bpm) göre sağlık skoru
+          </Text>
+        </View>
+      </View>
     );
   };
 
@@ -449,6 +475,19 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   legendText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  overviewExplanation: {
+    padding: 16,
+  },
+  explanationTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: 8,
+  },
+  explanationText: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.7)',
   },

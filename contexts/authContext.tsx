@@ -14,96 +14,80 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<UserType>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [isNavigationReady, setIsNavigationReady] = useState(true); // Hemen true yap
     const router = useRouter();
     
     useEffect(() => {
-        console.log('AuthContext useEffect started, navigation ready:', isNavigationReady);
+        console.log('AuthContext useEffect started');
         
         const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
             console.log('Auth state changed:', firebaseUser ? 'logged in' : 'logged out');
             
-            if (firebaseUser) {
-                setUser({
-                    uid: firebaseUser?.uid,
-                    email: firebaseUser?.email,
-                    firstName: firebaseUser?.displayName,
-                    lastName: firebaseUser?.displayName
-                });
-
-                try {
-                    // Kullanıcı verilerini al ve role'ü kontrol et - timeout ekle
-                    const timeoutPromise = new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Request timeout')), 5000)
-                    );
+            try {
+                if (firebaseUser) {
+                    // Kullanıcı verilerini al
+                    const userData = await getUserData(firebaseUser.uid);
                     
-                    const userData = await Promise.race([
-                        getUserData(firebaseUser.uid),
-                        timeoutPromise
-                    ]) as UserType;
-                    
-                    if (isNavigationReady) {
-                        // Navigation için kısa delay ekle
-                        setTimeout(async () => {
-                            if (userData?.role === 'doctor') {
-                                // Doktor ise doğrudan tabs'a yönlendir
-                                console.log("Doktor girişi yapıldı, rol:", userData.role);
-                                router.replace("/(tabs)");
-                            } else if (userData?.role === 'patient') {
-                                // Hasta ise health profile kontrolü yap
-                                const docRef = doc(db, "patients", firebaseUser.uid);
-                                const docSnap = await getDoc(docRef);
-                                
-                                if (docSnap.exists()) {
-                                    const patientData = docSnap.data();
-                                    if (!patientData.healthProfile) {
-                                        // Health profile yoksa onboarding'e yönlendir
-                                        router.replace("/(auth)/onboarding-modal");
-                                    } else {
-                                        router.replace("/(tabs)");
-                                    }
-                                } else {
-                                    router.replace("/(tabs)");
-                                }
-                            } else {
-                                // Kullanıcı bulunamadıysa welcome sayfasına yönlendir
-                                console.log("Kullanıcı bulunamadı, welcome sayfasına yönlendiriliyor");
-                                router.replace("/(auth)/welcome");
-                            }
-                        }, 100);
+                    if (userData) {
+                        console.log('User data loaded:', userData.role);
+                        setUser(userData);
+                    } else {
+                        console.log("User data bulunamadi");
+                        setUser(null);
                     }
-                } catch (error) {
-                    console.error("Kullanıcı verisi alınırken hata:", error);
-                    if (isNavigationReady) {
-                        setTimeout(() => {
-                            console.log('Error occurred, navigating to welcome');
-                            router.replace("/(auth)/welcome");
-                        }, 200);
-                    }
-                } finally {
-                    console.log('Setting loading to false after user data fetch');
-                    setIsLoading(false);
+                } else {
+                    console.log('No user found');
+                    setUser(null);
                 }
-            } else {
-                console.log('No user, redirecting to welcome');
+            } catch (error) {
+                console.error("Auth state change error:", error);
                 setUser(null);
+            } finally {
+                // Her durumda loading'i false yap
                 setIsLoading(false);
-                if (isNavigationReady) {
-                    setTimeout(() => {
-                        console.log('Navigating to welcome page');
-                        router.replace("/(auth)/welcome");
-                    }, 200);
-                }
+                console.log('Loading set to false');
             }
         });
 
-        return () => unsub();
-    }, [isNavigationReady]);
+        return () => {
+            console.log('Auth listener cleanup');
+            unsub();
+        };
+    }, []);
+
+    // User state değiştiğinde navigation yap
+    useEffect(() => {
+        if (!isLoading && user) {
+            console.log('Navigation effect triggered for user:', user.role);
+            
+            setTimeout(() => {
+                if (user.role === 'doctor') {
+                    console.log("Doktor tabs'a yonlendiriliyor");
+                    router.replace("/(tabs)");
+                } else if (user.role === 'patient') {
+                    if (!user.healthProfile) {
+                        console.log("Health profile eksik, onboarding'e yonlendiriliyor");
+                        router.replace("/(auth)/onboarding-modal");
+                    } else {
+                        console.log("Patient tabs'a yonlendiriliyor");
+                        router.replace("/(tabs)");
+                    }
+                } else {
+                    console.log("Welcome'a yonlendiriliyor");
+                    router.replace("/(auth)/welcome");
+                }
+            }, 100);
+        } else if (!isLoading && !user) {
+            console.log('No user, redirecting to welcome');
+            setTimeout(() => {
+                router.replace("/(auth)/welcome");
+            }, 100);
+        }
+    }, [user, isLoading]);
 
     const login = async (email: string, password: string) => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            return { success: true }
+            return { success: true };
 
         } catch (error: any) {
             let msg = error.message;
@@ -156,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // After registration, redirect to onboarding modal
             router.replace("/(auth)/onboarding-modal");
             
-            return { success: true }
+            return { success: true };
 
         } catch (error: any) {
             let msg = error.message;
@@ -196,7 +180,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     healthProfile: data.healthProfile || null,
                     role: 'patient'
                 };
-                setUser({ ...userData });
                 return userData;
             }
 
@@ -237,14 +220,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     },
                     role: data.role || 'doctor'
                 };
-                setUser({ ...userData });
                 return userData;
             }
 
-            return null;
+            // Kullanıcı hiçbir koleksiyonda bulunamadıysa, temel user oluştur
+            console.log('User not found in any collection, creating fallback user');
+            const fallbackUser: UserType = {
+                uid: uid,
+                email: null,
+                firstName: 'Kullanıcı',
+                lastName: '',
+                role: 'patient'
+            };
+            return fallbackUser;
         } catch (error: any) {
             console.log('Kullanıcı verisi alınırken hata:', error);
-            return null;
+            // Hata durumunda da fallback user döndür
+            const fallbackUser: UserType = {
+                uid: uid,
+                email: null,
+                firstName: 'Kullanıcı',
+                lastName: '',
+                role: 'patient'
+            };
+            return fallbackUser;
         }
     };
 
@@ -372,6 +371,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    // Kullanıcı manuel veri girişi kaydet
+    const saveUserHealthInput = async (
+        uid: string,
+        key: string,
+        value: any
+    ): Promise<{ success: boolean; msg?: string }> => {
+        try {
+            const userDocRef = doc(db, "patients", uid);
+            const docSnap = await getDoc(userDocRef);
+            
+            if (docSnap.exists()) {
+                const userData = docSnap.data();
+                const currentProfile = userData.healthProfile || {};
+                
+                // Manual entries'i güncelle
+                const manualEntries = currentProfile.manualEntries || {};
+                manualEntries[key] = {
+                    value,
+                    timestamp: Date.now(),
+                    source: 'user_input'
+                };
+
+                // Ana profile da kaydet
+                const updatedProfile = { ...currentProfile };
+                switch (key) {
+                    case 'weight':
+                        updatedProfile.weight = value;
+                        break;
+                    case 'height':
+                        updatedProfile.height = value;
+                        break;
+                    case 'bloodPressure':
+                        updatedProfile.bloodPressure = {
+                            ...value,
+                            timestamp: Date.now()
+                        };
+                        break;
+                    case 'age':
+                        updatedProfile.age = value;
+                        break;
+                    case 'gender':
+                        updatedProfile.gender = value;
+                        break;
+                }
+
+                updatedProfile.manualEntries = manualEntries;
+
+                // Firestore'a kaydet
+                await updateDoc(userDocRef, {
+                    healthProfile: updatedProfile
+                });
+
+                // Local state'i güncelle
+                setUser(prevUser => {
+                    if (prevUser) {
+                        return {
+                            ...prevUser,
+                            healthProfile: updatedProfile
+                        };
+                    }
+                    return prevUser;
+                });
+
+                console.log(`💾 Kullanıcı ${key} verisi kaydedildi:`, value);
+                return { success: true };
+            }
+
+            return { success: false, msg: 'Kullanıcı bulunamadı' };
+        } catch (error: any) {
+            console.error(`❌ ${key} verisi kaydedilirken hata:`, error);
+            return { 
+                success: false, 
+                msg: error.message || 'Veri kaydedilirken hata oluştu' 
+            };
+        }
+    };
+
     const contextValue: AuthContextType = {
         user,
         setUser,
@@ -382,29 +458,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProfileImage,
         refreshUserData,
         logout,
-        isLoading
-    }
-
-    // Loading screen göster
-    if (isLoading) {
-        return (
-            <AuthContext.Provider value={contextValue}>
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
-                    <Text style={{ fontSize: 18, color: '#333', marginBottom: 20 }}>Giriş kontrol ediliyor...</Text>
-                </View>
-            </AuthContext.Provider>
-        );
-    }
+        isLoading,
+        saveUserHealthInput
+    };
 
     return (
-        <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+        <AuthContext.Provider value={contextValue}>
+            {isLoading ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
+                    <Text style={{ fontSize: 18, color: '#333' }}>Yükleniyor...</Text>
+                </View>
+            ) : (
+                children
+            )}
+        </AuthContext.Provider>
     );
 };
 
 export const useAuth = (): AuthContextType => {
-    const context = useContext(AuthContext)
+    const context = useContext(AuthContext);
     if (!context) {
         throw new Error("useAuth must be used within an AuthProvider");
     }
     return context;
-}
+};

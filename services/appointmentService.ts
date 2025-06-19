@@ -205,11 +205,32 @@ export class AppointmentService {
       };
 
       const docRef = await addDoc(this.appointmentsCollection, finalData);
+      
+      // Randevu oluşturulduğunda otomatik hasta kaydı oluştur
+      try {
+        await this.createPatientRecordFromAppointment(appointmentData);
+      } catch (patientError) {
+        console.warn('Patient record creation failed, but appointment was created:', patientError);
+        // Hasta kaydı başarısız olursa sadece warn log'u at, randevuyu iptal etme
+      }
+      
       return docRef.id;
     } catch (error) {
       console.error('Error creating appointment:', error);
       throw error;
     }
+  }
+
+  // Randevu bilgilerinden hasta kaydı oluştur
+  private async createPatientRecordFromAppointment(appointmentData: AppointmentRequest): Promise<void> {
+    if (!appointmentData.patientName || !appointmentData.doctorId || !appointmentData.patientId) {
+      console.log('Insufficient patient data for creating patient record');
+      return;
+    }
+
+    // Hasta kaydı patients sayfasında otomatik olarak oluşturulacak
+    console.log(`📋 Appointment created for patient: ${appointmentData.patientName}`);
+    console.log(`🔗 Patient will be available in doctor's patient list automatically`);
   }
 
   async getAppointments(filter?: AppointmentFilter): Promise<Appointment[]> {

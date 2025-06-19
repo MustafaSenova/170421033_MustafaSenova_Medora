@@ -8,33 +8,11 @@ import * as SplashScreen from 'expo-splash-screen'
 SplashScreen.preventAutoHideAsync();
 
 const StackLayout = () => {
-  const [isReady, setIsReady] = useState(false);
-
   useEffect(() => {
-    const prepare = async () => {
-      try {
-        // Minimum loading time'ı kaldır, hızlı başlat
-        await new Promise(resolve => setTimeout(resolve, 100));
-        console.log('App initialization completed');
-      } catch (e) {
-        console.warn('App initialization error:', e);
-      } finally {
-        setIsReady(true);
-        SplashScreen.hideAsync();
-      }
-    };
-
-    prepare();
+    // Direkt olarak splash screen'i gizle
+    console.log('App initialization completed');
+    SplashScreen.hideAsync();
   }, []);
-
-  if (!isReady) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Yükleniyor...</Text>
-      </View>
-    );
-  }
 
   return (
     <Stack screenOptions={{headerShown:false}}>

@@ -143,6 +143,25 @@ export type UserHealthProfile = {
     relationship: string;
   };
   lastUpdated?: Date | string;
+  // Yeni alanlar - veri öncelik sistemi için
+  bloodPressure?: {
+    systolic: number;
+    diastolic: number;
+    timestamp: number;
+  };
+  cholesterol?: number; // 1: normal, 2: above normal, 3: well above normal
+  glucose?: number; // 1: normal, 2: above normal, 3: well above normal
+  smoking?: boolean;
+  alcohol?: boolean;
+  physicalActivity?: boolean;
+  // Kullanıcının manuel girdiği veriler
+  manualEntries?: {
+    [key: string]: {
+      value: any;
+      timestamp: number;
+      source: 'user_input';
+    };
+  };
 };
 
 export type DoctorProfile = {
@@ -196,6 +215,11 @@ export type AuthContextType = {
   refreshUserData: () => Promise<void>;
   logout: () => Promise<{ success: boolean; msg?: string }>;
   isLoading: boolean;
+  saveUserHealthInput: (
+    uid: string,
+    key: string,
+    value: any
+  ) => Promise<{ success: boolean; msg?: string }>;
 };
 
 export type ResponseType = {

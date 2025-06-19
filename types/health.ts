@@ -202,6 +202,32 @@ export interface ECGAnalysisPrediction {
   timestamp: number;
 }
 
+// EKG Model Weights structure
+export interface EKGLayerWeights {
+  kernel: number[][][];
+  bias: number[];
+}
+
+export interface EKGWeights {
+  weights: {
+    conv1d: EKGLayerWeights;
+    conv1d_1: EKGLayerWeights;
+    conv1d_2: EKGLayerWeights;
+    dense: EKGLayerWeights;
+    dense_1: EKGLayerWeights;
+  };
+  scaler: {
+    mean: number[];
+    scale: number[];
+  };
+  metadata: {
+    input_shape: number[];
+    output_classes: number;
+    model_type: string;
+    classes: Record<number, string>;
+  };
+}
+
 export interface AIHealthAssessment {
   id?: string; // Firestore document ID
   userId: string;
